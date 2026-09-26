@@ -132,6 +132,7 @@ const THEMES = {
 };
 
 const EXERCISE_TYPES = [
+  { id: 'none', name: '無運動 / 休息', emoji: '🛋️', calPerMin: 0 },
   { id: 'gym', name: '健身房重訓', emoji: '🏋️', calPerMin: 6.5 },
   { id: 'pilates', name: '機械式皮拉提斯', emoji: '🤸', calPerMin: 5.5 },
   { id: 'yoga', name: '瑜珈伸展', emoji: '🧘', calPerMin: 3.5 },
@@ -425,7 +426,14 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                   <span className="text-[11px] text-stone-400">運動類別</span>
                   <select
                     value={selectedExercise}
-                    onChange={(e) => setSelectedExercise(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedExercise(val);
+                      if (val === 'none') {setExerciseMinutes(0); // 選無運動時自動歸零時間與消耗
+                      }else if (exerciseMinutes === 0) {
+                        setExerciseMinutes(30); // 若切回其他運動且原本是0，自動預設30分鐘
+                      }
+                    }}
                     className="text-xs font-bold bg-stone-50 border border-stone-200 rounded-xl p-1 mt-0.5 outline-none"
                   >
                     {EXERCISE_TYPES.map((ex) => (
@@ -434,16 +442,24 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                       </option>
                     ))}
                   </select>
-                  <div className="flex items-center gap-1 mt-1">
-                    <input
-                      type="number"
-                      value={exerciseMinutes}
-                      onChange={(e) => setExerciseMinutes(Number(e.target.value))}
-                      className="w-10 text-xs font-bold border-b text-center border-stone-200 outline-none"
-                    />
-                    <span className="text-[10px] text-stone-400">分鐘</span>
-                  </div>
-                </div>
+
+                  {/* 如果選「無運動」，顯示「好好休息」，其餘運動才顯示分鐘輸入框 */}
+                 <div className="flex items-center gap-1 mt-1">
+                    {selectedExercise === 'none' ? (
+                       <span className="text-[10px] text-stone-400 py-0.5">今天好好休息 ☕</span>
+                     ) : (
+            <>
+              <input
+                type="number"
+                value={exerciseMinutes}
+                onChange={(e) => setExerciseMinutes(Number(e.target.value))}
+                className="w-10 text-xs font-bold border-b text-center border-stone-200 outline-none"
+               />
+              <span className="text-[10px] text-stone-400">分鐘</span>
+          </>
+        )}
+       </div>
+    </div>
 
                 <div className="flex flex-col items-end">
                   <span className="text-[11px] text-stone-400">總消耗</span>
@@ -816,11 +832,54 @@ function AddMealView({ theme, onMealLogged }) {
             </label>
           </div>
         ) : (
-          <label className="w-full py-8 border-2 border-dashed border-stone-300 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-stone-50 transition">
-            <span className="text-4xl">📸</span>
-            <span className="text-xs font-bold text-stone-600">點此拍照或選擇相片（會自動裁切入沙盒）</span>
-            <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
+          return (
+  <div className="flex flex-col gap-4">
+    <h2 className="text-lg font-black text-stone-800">拍照與新增餐點</h2>
+
+    <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col items-center gap-3">
+      {photoPreview ? (
+        <div className="relative w-40 h-40 rounded-3xl overflow-hidden border-2 border-amber-400 shadow-md">
+          <img src={photoPreview} alt="食物截圖" className="w-full h-full object-cover" />
+          <div className="absolute bottom-2 right-2 flex gap-1">
+            <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
+              📷 重拍
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+            </label>
+            <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
+              🖼️ 重選
+              <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <div className="w-full flex gap-3">
+          {/* 按鈕 1：直接啟動手機相機 */}
+          <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+            <span className="text-3xl">📷</span>
+            <span className="text-xs font-bold text-amber-800">直接拍照</span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleCapture}
+            />
           </label>
+
+          {/* 按鈕 2：直接打開手機相簿 */}
+          <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+            <span className="text-3xl">🖼️</span>
+            <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCapture}
+            />
+          </label>
+        </div>
+      )}
+    </div>
         )}
       </div>
 
