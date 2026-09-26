@@ -1140,14 +1140,20 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
   const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week' | 'month' | 'year'
   const [showWeightInput, setShowWeightInput] = useState(false);
 
+ // 1. 基本數值讀取
   const currentWeight = Number(userProfile?.weight) || 55;
-  const targetWeight = Number(userProfile?.targetWeight) || 50;
   const userHeight = Number(userProfile?.height) || 160;
   const waterGoal = Number(userProfile?.waterGoal) || 2000;
   const primaryTheme = theme?.primary || 'bg-amber-500 text-white';
 
+  // 2. 將 targetWeight 宣告為本地 State（先讀 props，沒有就讀 localStorage，預設 50）
+  const [targetWeight, setTargetWeight] = useState(() => {
+    return Number(userProfile?.targetWeight) || Number(localStorage.getItem('target_weight')) || 50;
+  });
+
+  // 3. 輸入框的暫存狀態
   const [inputWeightVal, setInputWeightVal] = useState(currentWeight.toString());
-  const [inputTargetWeightVal, setInputTargetWeightVal] = useState(targetWeight.toString());
+  const [inputTargetWeightVal, setInputTargetWeightVal] = useState(targetWeight.toString()); 
 
   const currentBMI = (currentWeight / Math.pow(userHeight / 100, 2)).toFixed(1);
 
@@ -1305,6 +1311,12 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
     if (!isNaN(w) && onUpdateWeight) onUpdateWeight(w);
 
     if (!isNaN(tw)) {
+      // 關鍵：這行會強制 React 立即把畫面上的數字換掉！
+      setTargetWeight(tw);
+
+      // 儲存到 localStorage，重整後依然存在
+      localStorage.setItem('target_weight', tw.toString());
+
       let existingProfile = {};
       try {
         existingProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
@@ -1320,22 +1332,15 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
       };
 
       localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
-      localStorage.setItem('target_weight', tw.toString());
 
       if (typeof setUserProfile === 'function') {
         setUserProfile(updatedProfile);
-      } else {
-        if (userProfile) {
-          userProfile.targetWeight = tw;
-          if (!isNaN(w)) userProfile.weight = w;
-        }
-        window.dispatchEvent(new Event('storage'));
       }
     }
 
     setShowWeightInput(false);
   };
-
+  
   // 體重安全縮放計算
   const validWeights = currentConfig.weights.filter((v) => v !== null && !isNaN(v));
   const minW = validWeights.length > 0 ? Math.min(...validWeights) - 0.5 : 40;
