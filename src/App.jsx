@@ -812,14 +812,14 @@ function AddMealView({ theme, onMealLogged }) {
             <img src={photoPreview} alt="食物截圖" className="w-full h-full object-cover" />
             <label className="absolute bottom-2 right-2 bg-black/60 text-white p-2 rounded-full cursor-pointer text-xs">
               🔄 重拍
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+              <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
             </label>
           </div>
         ) : (
           <label className="w-full py-8 border-2 border-dashed border-stone-300 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-stone-50 transition">
             <span className="text-4xl">📸</span>
             <span className="text-xs font-bold text-stone-600">點此拍照或選擇相片（會自動裁切入沙盒）</span>
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+            <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
           </label>
         )}
       </div>
