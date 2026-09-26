@@ -1132,292 +1132,309 @@ function AICoachView({ theme, statusContext }) {
 }
 
 /* =========================================================================
-   子頁面組件：趨勢視圖 (支援修改目標體重、近3天日視角、體重/飲水/步數全日週月年趨勢)
+   子頁面組件：趨勢視圖 (讀取真實紀錄、未填留空、支援修改目標體重)
    ========================================================================= */
-   function TrendsView({ userProfile, setUserProfile, weightHistory, onUpdateWeight, theme }) {
-    const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week' | 'month' | 'year'
-    const [showWeightInput, setShowWeightInput] = useState(false);
-    const [inputWeightVal, setInputWeightVal] = useState(userProfile.weight.toString());
-    const [inputTargetWeightVal, setInputTargetWeightVal] = useState(userProfile.targetWeight.toString());
-  
-    const currentBMI = (userProfile.weight / Math.pow(userProfile.height / 100, 2)).toFixed(1);
-  
-    // 1. 體重數據庫 (日 = 近 3 天)
-    const weightDataMap = {
-      day: {
-        labels: ['前天', '昨天', '今天'],
-        values: [userProfile.weight + 0.3, userProfile.weight + 0.1, userProfile.weight],
-        desc: '近 3 天體重變化',
-      },
-      week: {
-        labels: ['週一', '週二', '週三', '週四', '週五', '週六', '週日'],
-        values: [55.2, 55.0, 54.8, 54.9, 54.6, 54.7, userProfile.weight],
-        desc: '過去 7 天走勢',
-      },
-      month: {
-        labels: ['第 1 週', '第 2 週', '第 3 週', '本週'],
-        values: [55.8, 55.4, 54.9, userProfile.weight],
-        desc: '近 4 週平均走勢',
-      },
-      year: {
-        labels: ['1月', '3月', '5月', '7月', '9月', '11月'],
-        values: [57.0, 56.4, 55.8, 55.2, userProfile.weight, userProfile.weight - 0.2],
-        desc: '整年度走勢',
-      },
-    };
-  
-    // 2. 飲水趨勢數據庫 (ml)
-    const waterDataMap = {
-      day: {
-        labels: ['前天', '昨天', '今天'],
-        values: [1800, 2100, 1950],
-        desc: '近 3 天飲水量',
-      },
-      week: {
-        labels: ['週一', '週二', '週三', '週四', '週五', '週六', '週日'],
-        values: [1600, 1900, 2200, 1850, 2400, 2000, 2100],
-        desc: '過去 7 天飲水走勢',
-      },
-      month: {
-        labels: ['第 1 週', '第 2 週', '第 3 週', '本週'],
-        values: [1750, 1900, 2050, 2100],
-        desc: '近 4 週日均飲水',
-      },
-      year: {
-        labels: ['1月', '3月', '5月', '7月', '9月', '11月'],
-        values: [1500, 1700, 2100, 2400, 2200, 1950],
-        desc: '整年月均飲水量',
-      },
-    };
-  
-    // 3. 步數趨勢數據庫 (步)
-    const stepsDataMap = {
-      day: {
-        labels: ['前天', '昨天', '今天'],
-        values: [4800, 7200, 5600],
-        desc: '近 3 天步數累積',
-      },
-      week: {
-        labels: ['週一', '週二', '週三', '週四', '週五', '週六', '週日'],
-        values: [6200, 8100, 4500, 7300, 9200, 11000, 6420],
-        desc: '過去 7 天步數走勢',
-      },
-      month: {
-        labels: ['第 1 週', '第 2 週', '第 3 週', '本週'],
-        values: [6800, 7500, 7100, 8200],
-        desc: '近 4 週日均步數',
-      },
-      year: {
-        labels: ['1月', '3月', '5月', '7月', '9月', '11月'],
-        values: [5500, 6200, 7800, 8400, 7900, 7100],
-        desc: '整年月均日步數',
-      },
-    };
-  
-    const curWeight = weightDataMap[timeSpan];
-    const curWater = waterDataMap[timeSpan];
-    const curSteps = stepsDataMap[timeSpan];
-  
-    const handleSaveWeights = () => {
-      const w = parseFloat(inputWeightVal);
-      const tw = parseFloat(inputTargetWeightVal);
-      if (w) onUpdateWeight(w);
-      if (tw) setUserProfile((prev) => ({ ...prev, targetWeight: tw }));
-      setShowWeightInput(false);
-    };
-  
-    return (
-      <div className="flex flex-col gap-4">
-        {/* 週期切換：日 / 週 / 月 / 年 */}
-        <div className="grid grid-cols-4 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
-          {[
-            { key: 'day', label: '日' },
-            { key: 'week', label: '週' },
-            { key: 'month', label: '月' },
-            { key: 'year', label: '年' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setTimeSpan(tab.key)}
-              className={`py-1.5 rounded-xl transition ${
-                timeSpan === tab.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-  
-        {/* 體重與 BMI 概覽卡片（點擊可直接修改目前與目標體重） */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
-          <div className="grid grid-cols-3 gap-2 text-center items-center">
-            <div>
-              <span className="text-[10px] text-stone-400 font-bold block">目前體重</span>
-              <div className="text-xl font-black text-stone-800 mt-0.5">{userProfile.weight} kg</div>
-            </div>
-            <div className="border-x border-stone-100">
-              <span className="text-[10px] text-stone-400 font-bold block">目前 BMI</span>
-              <div className="text-xl font-black text-amber-600 mt-0.5">{currentBMI}</div>
-            </div>
-            <div>
-              <span className="text-[10px] text-stone-400 font-bold block">目標體重</span>
-              <div className="text-xl font-black text-stone-500 mt-0.5">{userProfile.targetWeight} kg</div>
-            </div>
-          </div>
-  
+function TrendsView({ userProfile, setUserProfile, weightHistory = [], onUpdateWeight, theme }) {
+  const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week' | 'month' | 'year'
+  const [showWeightInput, setShowWeightInput] = useState(false);
+  const [inputWeightVal, setInputWeightVal] = useState(userProfile.weight.toString());
+  const [inputTargetWeightVal, setInputTargetWeightVal] = useState(userProfile.targetWeight.toString());
+
+  const currentBMI = (userProfile.weight / Math.pow(userProfile.height / 100, 2)).toFixed(1);
+
+  // 取得近 7 天 YYYY-MM-DD 與星期名稱
+  const getPastDays = (count) => {
+    const list = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().split('T')[0];
+      const weekday = d.toLocaleDateString('zh-TW', { weekday: 'narrow' });
+      list.push({ date: iso, label: i === 0 ? '今天' : i === 1 ? '昨天' : `週${weekday}` });
+    }
+    return list;
+  };
+
+  // 讀取真實紀錄（從 localStorage 的 daily_records 物件抓取）
+  const storedDaily = JSON.parse(localStorage.getItem('daily_records') || '{}');
+  const past7 = getPastDays(7);
+  const past3 = getPastDays(3);
+
+  // 1. 體重真實數據（沒量過就是 null，不塞假數字）
+  const getWeightValues = (days) => {
+    return days.map((d, idx) => {
+      // 如果是今天，取目前 profile.weight，否則看歷史紀錄
+      if (idx === days.length - 1 && userProfile.weight) return Number(userProfile.weight);
+      const record = storedDaily[d.date];
+      if (record && record.weight) return Number(record.weight);
+      // 從 weightHistory 陣列反查相符日期的記錄
+      const hist = weightHistory.find((w) => w.date === d.date);
+      return hist ? Number(hist.weight) : null;
+    });
+  };
+
+  // 2. 飲水真實數據（沒記錄就是 null）
+  const getWaterValues = (days) => {
+    return days.map((d) => {
+      const record = storedDaily[d.date];
+      return record && record.water !== undefined ? Number(record.water) : null;
+    });
+  };
+
+  // 3. 步數真實數據（沒記錄就是 null）
+  const getStepsValues = (days) => {
+    return days.map((d) => {
+      const record = storedDaily[d.date];
+      return record && record.steps !== undefined ? Number(record.steps) : null;
+    });
+  };
+
+  const daysConfig = timeSpan === 'day' ? past3 : past7;
+
+  const curWeight = {
+    labels: daysConfig.map((d) => d.label),
+    values: getWeightValues(daysConfig),
+    desc: timeSpan === 'day' ? '近 3 天體重變化' : '近 7 天走勢',
+  };
+
+  const curWater = {
+    labels: daysConfig.map((d) => d.label),
+    values: getWaterValues(daysConfig),
+    desc: timeSpan === 'day' ? '近 3 天飲水量' : '過去 7 天飲水走勢',
+  };
+
+  const curSteps = {
+    labels: daysConfig.map((d) => d.label),
+    values: getStepsValues(daysConfig),
+    desc: timeSpan === 'day' ? '近 3 天步數累積' : '過去 7 天步數走勢',
+  };
+
+  const handleSaveWeights = () => {
+    const w = parseFloat(inputWeightVal);
+    const tw = parseFloat(inputTargetWeightVal);
+    if (w) onUpdateWeight(w);
+    if (tw) {
+      setUserProfile((prev) => ({ ...prev, targetWeight: tw }));
+      localStorage.setItem('target_weight', tw);
+    }
+    setShowWeightInput(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* 週期切換：日 / 週 */}
+      <div className="grid grid-cols-2 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
+        {[
+          { key: 'day', label: '近 3 天' },
+          { key: 'week', label: '近 7 天' },
+        ].map((tab) => (
           <button
-            onClick={() => setShowWeightInput(true)}
-            className={`w-full py-2.5 rounded-2xl text-xs font-bold shadow-xs active:scale-95 transition ${theme.primary}`}
+            key={tab.key}
+            onClick={() => setTimeSpan(tab.key)}
+            className={`py-1.5 rounded-xl transition ${
+              timeSpan === tab.key ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'
+            }`}
           >
-            ⚖️ 修改目前 / 目標體重
+            {tab.label}
           </button>
+        ))}
+      </div>
+
+      {/* 體重與 BMI 概覽卡片 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
+        <div className="grid grid-cols-3 gap-2 text-center items-center">
+          <div>
+            <span className="text-[10px] text-stone-400 font-bold block">目前體重</span>
+            <div className="text-xl font-black text-stone-800 mt-0.5">{userProfile.weight} kg</div>
+          </div>
+          <div className="border-x border-stone-100">
+            <span className="text-[10px] text-stone-400 font-bold block">目前 BMI</span>
+            <div className="text-xl font-black text-amber-600 mt-0.5">{currentBMI}</div>
+          </div>
+          <div>
+            <span className="text-[10px] text-stone-400 font-bold block">目標體重</span>
+            <div className="text-xl font-black text-stone-500 mt-0.5">{userProfile.targetWeight} kg</div>
+          </div>
         </div>
-  
-        {/* 體重輸入彈窗 (同時支援目前體重與目標體重修改) */}
-        {showWeightInput && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl flex flex-col gap-3 border border-stone-100">
-              <h3 className="font-bold text-sm text-stone-800">體重目標管理</h3>
-              <div>
-                <label className="text-[11px] text-stone-400 font-bold block mb-1">目前體重 (kg)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={inputWeightVal}
-                  onChange={(e) => setInputWeightVal(e.target.value)}
-                  className="w-full border border-stone-200 rounded-xl p-2.5 text-base font-black text-center outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-stone-400 font-bold block mb-1">目標體重 (kg)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={inputTargetWeightVal}
-                  onChange={(e) => setInputTargetWeightVal(e.target.value)}
-                  className="w-full border border-stone-200 rounded-xl p-2.5 text-base font-black text-center outline-none focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => setShowWeightInput(false)}
-                  className="flex-1 py-2 text-xs font-bold rounded-xl bg-stone-100 text-stone-600"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSaveWeights}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl ${theme.primary}`}
-                >
-                  儲存
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-  
-        {/* 1. 體重變化趨勢卡片 */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
-          <div className="flex justify-between items-baseline">
+
+        <button
+          onClick={() => setShowWeightInput(true)}
+          className={`w-full py-2.5 rounded-2xl text-xs font-bold shadow-xs active:scale-95 transition ${theme.primary}`}
+        >
+          ⚖️ 修改目前 / 目標體重
+        </button>
+      </div>
+
+      {/* 體重輸入彈窗 */}
+      {showWeightInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl flex flex-col gap-3 border border-stone-100">
+            <h3 className="font-bold text-sm text-stone-800">體重目標管理</h3>
             <div>
-              <span className="text-xs font-bold text-stone-700">⚖️ 體重變化</span>
-              <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curWeight.desc})</span>
+              <label className="text-[11px] text-stone-400 font-bold block mb-1">目前體重 (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={inputWeightVal}
+                onChange={(e) => setInputWeightVal(e.target.value)}
+                className="w-full border border-stone-200 rounded-xl p-2.5 text-base font-black text-center outline-none focus:ring-2 focus:ring-amber-400"
+              />
             </div>
-            <span className="text-[11px] text-emerald-600 font-bold">
-              距離目標還差 {(userProfile.weight - userProfile.targetWeight).toFixed(1)} kg
-            </span>
+            <div>
+              <label className="text-[11px] text-stone-400 font-bold block mb-1">目標體重 (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={inputTargetWeightVal}
+                onChange={(e) => setInputTargetWeightVal(e.target.value)}
+                className="w-full border border-stone-200 rounded-xl p-2.5 text-base font-black text-center outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => setShowWeightInput(false)}
+                className="flex-1 py-2 text-xs font-bold rounded-xl bg-stone-100 text-stone-600"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveWeights}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl ${theme.primary}`}
+              >
+                確定儲存
+              </button>
+            </div>
           </div>
-          <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-            {curWeight.values.map((val, idx) => {
-              const minW = Math.min(...curWeight.values) - 0.5;
-              const maxW = Math.max(...curWeight.values) + 0.5;
-              const h = Math.max(20, Math.min(100, ((val - minW) / (maxW - minW || 1)) * 100));
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+        </div>
+      )}
+
+      {/* 1. 體重變化趨勢卡片 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
+        <div className="flex justify-between items-baseline">
+          <div>
+            <span className="text-xs font-bold text-stone-700">⚖️ 體重變化</span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curWeight.desc})</span>
+          </div>
+          <span className="text-[11px] text-emerald-600 font-bold">
+            距離目標還差 {(userProfile.weight - userProfile.targetWeight).toFixed(1)} kg
+          </span>
+        </div>
+        <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
+          {curWeight.values.map((val, idx) => {
+            const hasVal = val !== null && !isNaN(val);
+            const validVals = curWeight.values.filter((v) => v !== null && !isNaN(v));
+            const minW = validVals.length ? Math.min(...validVals) - 0.5 : 40;
+            const maxW = validVals.length ? Math.max(...validVals) + 0.5 : 80;
+            const h = hasVal ? Math.max(20, Math.min(100, ((val - minW) / (maxW - minW || 1)) * 100)) : 0;
+
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                {hasVal ? (
                   <div
                     className={`w-full rounded-t-lg transition-all duration-300 ${
                       idx === curWeight.values.length - 1 ? 'bg-amber-500' : 'bg-amber-300/80'
                     }`}
                     style={{ height: `${h}%` }}
                   />
-                  <span className="text-[9px] text-stone-500 font-mono font-bold">{val.toFixed(1)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-            {curWeight.labels.map((lbl, idx) => (
-              <span key={idx} className="text-center flex-1">{lbl}</span>
-            ))}
-          </div>
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-stone-200 my-auto" />
+                )}
+                <span className="text-[9px] text-stone-400 font-mono font-bold">
+                  {hasVal ? val.toFixed(1) : '--'}
+                </span>
+              </div>
+            );
+          })}
         </div>
-  
-        {/* 2. 飲水走勢趨勢卡片（放大獨立大卡片，跟隨日週月年切換） */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
-          <div className="flex justify-between items-baseline">
-            <div>
-              <span className="text-xs font-bold text-sky-700">💧 飲水走勢</span>
-              <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curWater.desc})</span>
-            </div>
-            <span className="text-[11px] text-sky-600 font-bold">每日目標 {userProfile.waterGoal} ml</span>
+        <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
+          {curWeight.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* 2. 飲水走勢趨勢卡片 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
+        <div className="flex justify-between items-baseline">
+          <div>
+            <span className="text-xs font-bold text-sky-700">💧 飲水走勢</span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curWater.desc})</span>
           </div>
-          <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-            {curWater.values.map((val, idx) => {
-              const h = Math.max(15, Math.min(100, (val / (userProfile.waterGoal * 1.3)) * 100));
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+          <span className="text-[11px] text-sky-600 font-bold">每日目標 {userProfile.waterGoal} ml</span>
+        </div>
+        <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
+          {curWater.values.map((val, idx) => {
+            const hasVal = val !== null && val > 0;
+            const h = hasVal ? Math.max(15, Math.min(100, (val / (userProfile.waterGoal * 1.3)) * 100)) : 0;
+
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                {hasVal ? (
                   <div
                     className={`w-full rounded-t-lg transition-all duration-300 ${
                       val >= userProfile.waterGoal ? 'bg-sky-500' : 'bg-sky-300/80'
                     }`}
                     style={{ height: `${h}%` }}
                   />
-                  <span className="text-[9px] text-stone-500 font-mono font-bold">{val}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-            {curWater.labels.map((lbl, idx) => (
-              <span key={idx} className="text-center flex-1">{lbl}</span>
-            ))}
-          </div>
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-stone-200 my-auto" />
+                )}
+                <span className="text-[9px] text-stone-400 font-mono font-bold">
+                  {hasVal ? val : '--'}
+                </span>
+              </div>
+            );
+          })}
         </div>
-  
-        {/* 3. 步數走勢趨勢卡片（放大獨立大卡片，跟隨日週月年切換） */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
-          <div className="flex justify-between items-baseline">
-            <div>
-              <span className="text-xs font-bold text-emerald-700">👟 步數走勢</span>
-              <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curSteps.desc})</span>
-            </div>
-            <span className="text-[11px] text-emerald-600 font-bold">健康基準 8,000 步</span>
+        <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
+          {curWater.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. 步數走勢趨勢卡片 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
+        <div className="flex justify-between items-baseline">
+          <div>
+            <span className="text-xs font-bold text-emerald-700">👟 步數走勢</span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({curSteps.desc})</span>
           </div>
-          <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-            {curSteps.values.map((val, idx) => {
-              const h = Math.max(15, Math.min(100, (val / 12000) * 100));
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+          <span className="text-[11px] text-emerald-600 font-bold">健康基準 8,000 步</span>
+        </div>
+        <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
+          {curSteps.values.map((val, idx) => {
+            const hasVal = val !== null && val > 0;
+            const h = hasVal ? Math.max(15, Math.min(100, (val / 12000) * 100)) : 0;
+
+            return (
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                {hasVal ? (
                   <div
                     className={`w-full rounded-t-lg transition-all duration-300 ${
                       val >= 8000 ? 'bg-emerald-500' : 'bg-emerald-300/80'
                     }`}
                     style={{ height: `${h}%` }}
                   />
-                  <span className="text-[9px] text-stone-500 font-mono font-bold">{(val / 1000).toFixed(1)}k</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-            {curSteps.labels.map((lbl, idx) => (
-              <span key={idx} className="text-center flex-1">{lbl}</span>
-            ))}
-          </div>
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-stone-200 my-auto" />
+                )}
+                <span className="text-[9px] text-stone-400 font-mono font-bold">
+                  {hasVal ? (val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val) : '--'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
+          {curSteps.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
+          ))}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 /* =========================================================================
    子頁面組件：設定視圖 (新增「加入主畫面」指引與按鈕)
    ========================================================================= */
