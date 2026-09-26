@@ -180,7 +180,15 @@ export default function App() {
   const [dayType, setDayType] = useState('rest');
   const currentTarget = dayType === 'workout' ? userProfile.workoutDay : userProfile.restDay;
 
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // 取得本地年月日 YYYY-MM-DD
+const getLocalDateString = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [meals, setMeals] = useState(() => {
@@ -233,9 +241,10 @@ export default function App() {
   const totalBurn = stepBurn + workoutBurn;
 
   const formattedDateString = (() => {
-    const d = new Date(selectedDate);
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const localDate = new Date(y, m - 1, d); // 依本地年月日建立
     const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+    return `${m}月${d}日 ${weekdays[localDate.getDay()]}`;
   })();
 
   // 登記新體重
@@ -292,7 +301,7 @@ export default function App() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
-                        setSelectedDate(new Date().toISOString().split('T')[0]);
+                        setSelectedDate(getLocalDateString());
                         setShowDatePicker(false);
                       }}
                       className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-stone-100 text-stone-600"
