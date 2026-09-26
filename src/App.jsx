@@ -368,7 +368,9 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
               ].map((m, idx) => (
                 <div key={idx} className="bg-white p-3 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-bold text-stone-400 block">{m.name}剩餘</span>
+                    <span className="text-[10px] font-bold text-stone-400 block leading-tight">
+                      {m.name}<br />剩餘
+                    </span>
                     <div className="text-lg font-black text-stone-800">{m.remain > 0 ? m.remain : 0}g</div>
                     <span className="text-[9px] text-stone-400">目標 {m.total}g</span>
                   </div>
