@@ -1132,13 +1132,12 @@ function AICoachView({ theme, statusContext }) {
 }
 
 /* =========================================================================
-   子頁面組件：趨勢視圖 (防白屏修復版：安全容錯、未填留空、目標體重儲存)
+   子頁面組件：趨勢視圖 (完整日/週/月/年切換、真實資料留空、安全防崩潰)
    ========================================================================= */
 function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUpdateWeight, theme = {} }) {
-  const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week'
+  const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week' | 'month' | 'year'
   const [showWeightInput, setShowWeightInput] = useState(false);
 
-  // 安全取值，避免 undefined.toString() 當機
   const currentWeight = Number(userProfile?.weight) || 55;
   const targetWeight = Number(userProfile?.targetWeight) || 50;
   const userHeight = Number(userProfile?.height) || 160;
@@ -1150,20 +1149,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
 
   const currentBMI = (currentWeight / Math.pow(userHeight / 100, 2)).toFixed(1);
 
-  // 取得近 N 天日期
-  const getPastDays = (count) => {
-    const list = [];
-    for (let i = count - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString().split('T')[0];
-      const weekday = d.toLocaleDateString('zh-TW', { weekday: 'narrow' });
-      list.push({ date: iso, label: i === 0 ? '今天' : i === 1 ? '昨天' : `週${weekday}` });
-    }
-    return list;
-  };
-
-  // 安全讀取 localStorage
+  // 安全讀取歷史紀錄
   let storedDaily = {};
   try {
     storedDaily = JSON.parse(localStorage.getItem('daily_records') || '{}');
@@ -1171,55 +1157,198 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
     storedDaily = {};
   }
 
-  const past7 = getPastDays(7);
-  const past3 = getPastDays(3);
-  const daysConfig = timeSpan === 'day' ? past3 : past7;
+  // 1. 日視角：近 3 天
+  const getDayConfig = () => {
+    const list = [];
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().split('T')[0];
+      const lbl = i === 0 ? '今天' : i === 1 ? '昨天' : '前天';
+      list.push({ date: iso, label: lbl });
+    }
+    return {
+      labels: list.map((item) => item.label),
+      weights: list.map((item, idx) => {
+        if (idx === list.length - 1 && currentWeight) return currentWeight;
+        const rec = storedDaily[item.date];
+        return rec?.weight ? Number(rec.weight) : null;
+      }),
+      waters: list.map((item) => {
+        const rec = storedDaily[item.date];
+        return rec?.water !== undefined ? Number(rec.water) : null;
+      }),
+      steps: list.map((item) => {
+        const rec = storedDaily[item.date];
+        return rec?.steps !== undefined ? Number(rec.steps) : null;
+      }),
+      desc: '近 3 天變化',
+    };
+  };
 
-  // 1. 體重真實數據
-  const weightValues = daysConfig.map((d, idx) => {
-    if (idx === daysConfig.length - 1 && currentWeight) return currentWeight;
-    const record = storedDaily[d.date];
-    if (record && record.weight) return Number(record.weight);
-    const hist = Array.isArray(weightHistory) ? weightHistory.find((w) => w?.date === d.date) : null;
-    return hist ? Number(hist.weight) : null;
-  });
+  // 2. 週視角：近 7 天
+  const getWeekConfig = () => {
+    const list = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().split('T')[0];
+      const weekday = d.toLocaleDateString('zh-TW', { weekday: 'narrow' });
+      list.push({ date: iso, label: i === 0 ? '今天' : `週${weekday}` });
+    }
+    return {
+      labels: list.map((item) => item.label),
+      weights: list.map((item, idx) => {
+        if (idx === list.length - 1 && currentWeight) return currentWeight;
+        const rec = storedDaily[item.date];
+        return rec?.weight ? Number(rec.weight) : null;
+      }),
+      waters: list.map((item) => {
+        const rec = storedDaily[item.date];
+        return rec?.water !== undefined ? Number(rec.water) : null;
+      }),
+      steps: list.map((item) => {
+        const rec = storedDaily[item.date];
+        return rec?.steps !== undefined ? Number(rec.steps) : null;
+      }),
+      desc: '近 7 天走勢',
+    };
+  };
 
-  // 2. 飲水真實數據
-  const waterValues = daysConfig.map((d) => {
-    const record = storedDaily[d.date];
-    return record && record.water !== undefined ? Number(record.water) : null;
-  });
+  // 3. 月視角：近 4 週
+  const getMonthConfig = () => {
+    const labels = ['3週前', '2週前', '上週', '本週'];
+    const now = new Date();
+    const weeksData = [0, 1, 2, 3].map((weekOffset) => {
+      const dates = [];
+      for (let day = 0; day < 7; day++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - (weekOffset * 7 + day));
+        dates.push(d.toISOString().split('T')[0]);
+      }
+      return dates;
+    }).reverse();
 
-  // 3. 步數真實數據
-  const stepsValues = daysConfig.map((d) => {
-    const record = storedDaily[d.date];
-    return record && record.steps !== undefined ? Number(record.steps) : null;
-  });
+    const calcAvg = (field) => {
+      return weeksData.map((weekDates, idx) => {
+        const vals = weekDates.map((dateStr) => {
+          if (idx === 3 && dateStr === now.toISOString().split('T')[0] && field === 'weight') {
+            return currentWeight;
+          }
+          const rec = storedDaily[dateStr];
+          return rec?.[field] !== undefined ? Number(rec[field]) : null;
+        }).filter((v) => v !== null && !isNaN(v));
+
+        if (vals.length === 0) return null;
+        const sum = vals.reduce((a, b) => a + b, 0);
+        return field === 'weight' ? Number((sum / vals.length).toFixed(1)) : Math.round(sum / vals.length);
+      });
+    };
+
+    return {
+      labels,
+      weights: calcAvg('weight'),
+      waters: calcAvg('water'),
+      steps: calcAvg('steps'),
+      desc: '近 4 週平均走勢',
+    };
+  };
+
+  // 4. 年視角：近 6 個雙月 (1, 3, 5, 7, 9, 11月)
+  const getYearConfig = () => {
+    const labels = ['1月', '3月', '5月', '7月', '9月', '11月'];
+    const currentYear = new Date().getFullYear();
+    const months = [1, 3, 5, 7, 9, 11];
+
+    const calcMonthAvg = (field) => {
+      return months.map((m) => {
+        const targetPrefix = `${currentYear}-${String(m).padStart(2, '0')}`;
+        const vals = Object.keys(storedDaily)
+          .filter((k) => k.startsWith(targetPrefix))
+          .map((k) => storedDaily[k]?.[field])
+          .filter((v) => v !== undefined && v !== null && !isNaN(v))
+          .map(Number);
+
+        if (m === new Date().getMonth() + 1 && field === 'weight') {
+          vals.push(currentWeight);
+        }
+
+        if (vals.length === 0) return null;
+        const sum = vals.reduce((a, b) => a + b, 0);
+        return field === 'weight' ? Number((sum / vals.length).toFixed(1)) : Math.round(sum / vals.length);
+      });
+    };
+
+    return {
+      labels,
+      weights: calcMonthAvg('weight'),
+      waters: calcMonthAvg('water'),
+      steps: calcMonthAvg('steps'),
+      desc: '整年度走勢',
+    };
+  };
+
+  // 根據 timeSpan 選擇當前資料結構
+  const currentConfig = {
+    day: getDayConfig(),
+    week: getWeekConfig(),
+    month: getMonthConfig(),
+    year: getYearConfig(),
+  }[timeSpan];
 
   const handleSaveWeights = () => {
     const w = parseFloat(inputWeightVal);
     const tw = parseFloat(inputTargetWeightVal);
-    if (w && onUpdateWeight) onUpdateWeight(w);
-    if (tw && setUserProfile) {
-      setUserProfile((prev) => ({ ...prev, targetWeight: tw }));
+
+    if (!isNaN(w) && onUpdateWeight) onUpdateWeight(w);
+
+    if (!isNaN(tw)) {
+      let existingProfile = {};
+      try {
+        existingProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+      } catch (e) {
+        existingProfile = {};
+      }
+
+      const updatedProfile = {
+        ...existingProfile,
+        ...(userProfile || {}),
+        weight: !isNaN(w) ? w : (userProfile?.weight || 55),
+        targetWeight: tw,
+      };
+
+      localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
       localStorage.setItem('target_weight', tw.toString());
+
+      if (typeof setUserProfile === 'function') {
+        setUserProfile(updatedProfile);
+      } else {
+        if (userProfile) {
+          userProfile.targetWeight = tw;
+          if (!isNaN(w)) userProfile.weight = w;
+        }
+        window.dispatchEvent(new Event('storage'));
+      }
     }
+
     setShowWeightInput(false);
   };
 
-  // 安全計算體重高度比例，防止 Math.min(...[]) 炸裂
-  const validWeights = weightValues.filter((v) => v !== null && !isNaN(v));
+  // 體重安全縮放計算
+  const validWeights = currentConfig.weights.filter((v) => v !== null && !isNaN(v));
   const minW = validWeights.length > 0 ? Math.min(...validWeights) - 0.5 : 40;
   const maxW = validWeights.length > 0 ? Math.max(...validWeights) + 0.5 : 80;
   const rangeW = maxW - minW || 1;
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 週期切換：日 / 週 */}
-      <div className="grid grid-cols-2 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
+      {/* 週期切換：日 / 週 / 月 / 年 4 個維度 */}
+      <div className="grid grid-cols-4 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
         {[
-          { key: 'day', label: '近 3 天' },
-          { key: 'week', label: '近 7 天' },
+          { key: 'day', label: '日' },
+          { key: 'week', label: '週' },
+          { key: 'month', label: '月' },
+          { key: 'year', label: '年' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1314,16 +1443,14 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         <div className="flex justify-between items-baseline">
           <div>
             <span className="text-xs font-bold text-stone-700">⚖️ 體重變化</span>
-            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">
-              ({timeSpan === 'day' ? '近 3 天' : '近 7 天'})
-            </span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({currentConfig.desc})</span>
           </div>
           <span className="text-[11px] text-emerald-600 font-bold">
             距離目標還差 {(currentWeight - targetWeight).toFixed(1)} kg
           </span>
         </div>
         <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-          {weightValues.map((val, idx) => {
+          {currentConfig.weights.map((val, idx) => {
             const hasVal = val !== null && !isNaN(val);
             const h = hasVal ? Math.max(20, Math.min(100, ((val - minW) / rangeW) * 100)) : 0;
 
@@ -1332,7 +1459,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
                 {hasVal ? (
                   <div
                     className={`w-full rounded-t-lg transition-all duration-300 ${
-                      idx === weightValues.length - 1 ? 'bg-amber-500' : 'bg-amber-300/80'
+                      idx === currentConfig.weights.length - 1 ? 'bg-amber-500' : 'bg-amber-300/80'
                     }`}
                     style={{ height: `${h}%` }}
                   />
@@ -1347,8 +1474,8 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
           })}
         </div>
         <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-          {daysConfig.map((d, idx) => (
-            <span key={idx} className="text-center flex-1">{d.label}</span>
+          {currentConfig.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
           ))}
         </div>
       </div>
@@ -1358,14 +1485,12 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         <div className="flex justify-between items-baseline">
           <div>
             <span className="text-xs font-bold text-sky-700">💧 飲水走勢</span>
-            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">
-              ({timeSpan === 'day' ? '近 3 天' : '近 7 天'})
-            </span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({currentConfig.desc})</span>
           </div>
           <span className="text-[11px] text-sky-600 font-bold">每日目標 {waterGoal} ml</span>
         </div>
         <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-          {waterValues.map((val, idx) => {
+          {currentConfig.waters.map((val, idx) => {
             const hasVal = val !== null && val > 0;
             const h = hasVal ? Math.max(15, Math.min(100, (val / (waterGoal * 1.3)) * 100)) : 0;
 
@@ -1389,8 +1514,8 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
           })}
         </div>
         <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-          {daysConfig.map((d, idx) => (
-            <span key={idx} className="text-center flex-1">{d.label}</span>
+          {currentConfig.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
           ))}
         </div>
       </div>
@@ -1400,14 +1525,12 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         <div className="flex justify-between items-baseline">
           <div>
             <span className="text-xs font-bold text-emerald-700">👟 步數走勢</span>
-            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">
-              ({timeSpan === 'day' ? '近 3 天' : '近 7 天'})
-            </span>
+            <span className="text-[10px] text-stone-400 ml-1.5 font-normal">({currentConfig.desc})</span>
           </div>
           <span className="text-[11px] text-emerald-600 font-bold">健康基準 8,000 步</span>
         </div>
         <div className="h-32 flex items-end justify-between pt-5 px-1 gap-2 border-b border-stone-100 pb-2">
-          {stepsValues.map((val, idx) => {
+          {currentConfig.steps.map((val, idx) => {
             const hasVal = val !== null && val > 0;
             const h = hasVal ? Math.max(15, Math.min(100, (val / 12000) * 100)) : 0;
 
@@ -1431,8 +1554,8 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
           })}
         </div>
         <div className="flex justify-between text-[10px] text-stone-400 px-0.5 mt-0.5 font-medium">
-          {daysConfig.map((d, idx) => (
-            <span key={idx} className="text-center flex-1">{d.label}</span>
+          {currentConfig.labels.map((lbl, idx) => (
+            <span key={idx} className="text-center flex-1">{lbl}</span>
           ))}
         </div>
       </div>
