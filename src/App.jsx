@@ -377,47 +377,31 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                     </div>
                     <span className="text-[9px] text-stone-400">目標 {m.total}g</span>
                 </div>
-                  <div className="relative w-11 h-11 flex items-center justify-center">
+                  {/* 右側圓環進度條（只保留這裡的 Emoji） */}
+                  <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                      <path className="text-stone-100" strokeWidth="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       <path
-                        className={theme.ring}
-                        strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
-                        strokeWidth="4"
-                        strokeLinecap="round"
+                        className="text-stone-100"
+                        strokeWidth="3.5"
                         stroke="currentColor"
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                    </svg>
-                    <span className="absolute text-xs">{m.emoji}</span>
-                  </div>
-
-                  {/* 右側圓環進度條與 Emoji */}
-                  <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center">
-                   <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                     />
                     <path
-                     className="text-stone-100"
-                     strokeWidth="3.5"
-                     stroke="currentColor"
-                     fill="none"
-                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                   />
-                   <path
-                     className={theme?.ring || 'text-amber-500'}
-                     strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
-                     strokeWidth="3.5"
-                     strokeLinecap="round"
-                     stroke="currentColor"
-                     fill="none"
-                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <span className="absolute text-xs">{m.emoji}</span>
-              </div>
+                      className={theme?.ring || 'text-amber-500'}
+                      strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      stroke="currentColor"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />  
+                    </svg>
+                    <span className="absolute text-sm select-none">{m.emoji}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-           ))}
-         </div>
 
             {/* 運動量與消耗 */}
             <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
