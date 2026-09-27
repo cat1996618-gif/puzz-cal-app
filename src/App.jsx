@@ -389,6 +389,20 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                     </svg>
                     <span className="absolute text-xs">{m.emoji}</span>
                   </div>
+
+                  {/* 左側資訊區：不受右邊擠壓 */}
+                  <div>
+                    <span className="text-[10px] font-bold text-stone-400 block leading-tight">
+                     {m.name}<br />剩餘
+                    </span>
+                    <div className="text-base font-black text-stone-800 mt-1 tracking-tight">
+                       {m.remain > 0 ? (Number.isInteger(m.remain) ? m.remain : m.remain.toFixed(1)) : 0}g
+                    </div>
+                 </div>
+
+                 <div className="text-[9px] text-stone-400 mt-1">
+                   目標 {m.total}g
+                 </div>
                 </div>
               ))}
             </div>
