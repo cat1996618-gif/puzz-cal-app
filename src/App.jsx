@@ -787,7 +787,7 @@ function AddMealView({ theme, onMealLogged }) {
         if (!genAI) throw new Error('未偵測到 Gemini API Key，請先在設定中填入金鑰！');
 
         const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-1.5-flash-latest',
           generationConfig: {
             responseMimeType: 'application/json',
             responseSchema: {
