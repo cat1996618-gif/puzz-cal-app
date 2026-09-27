@@ -787,7 +787,7 @@ function AddMealView({ theme, onMealLogged }) {
         if (!genAI) throw new Error('未偵測到 Gemini API Key，請先在設定中填入金鑰！');
 
         const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           generationConfig: {
             responseMimeType: 'application/json',
             responseSchema: {
@@ -1024,7 +1024,7 @@ function AICoachView({ theme, statusContext }) {
     try {
       if (!genAI) throw new Error('喵！找不到 API Key，請在設定確認一下金鑰喔～');
 
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const cutePrompt = `你是一隻熱愛美食、溫柔又專業的貓咪營養教練，名字叫「喵卡（MewCal）」🐾。
 你的說話風格：
 1. 語氣超級可愛、暖心、元氣滿滿，句尾常自然地帶「喵～」、「(=^･ω･^=)」、「✨」、「🐾」。
