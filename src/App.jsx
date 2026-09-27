@@ -366,14 +366,17 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                 { name: '蛋白質', emoji: '🥩', remain: remainProtein, total: currentTarget.protein, consumed: consumedProtein },
                 { name: '油脂', emoji: '🥑', remain: remainFat, total: currentTarget.fat, consumed: consumedFat },
               ].map((m, idx) => (
-                <div key={idx} className="bg-white p-3 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-stone-400 block leading-tight">
-                      {m.name}<br />剩餘
+                 <div key={idx} className="bg-white p-2.5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+                   {/* 左側數值資訊 */}
+                   <div className="flex flex-col">
+                     <span className="text-[10px] font-bold text-stone-400 leading-tight">
+                       {m.name}<br />剩餘
                     </span>
-                    <div className="text-lg font-black text-stone-800">{m.remain > 0 ? m.remain : 0}g</div>
+                    <div className="text-base font-black text-stone-800 my-0.5 tracking-tight">
+                      {m.remain > 0 ? (Number.isInteger(m.remain) ? m.remain : m.remain.toFixed(1)) : 0}g
+                    </div>
                     <span className="text-[9px] text-stone-400">目標 {m.total}g</span>
-                  </div>
+                </div>
                   <div className="relative w-11 h-11 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                       <path className="text-stone-100" strokeWidth="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
@@ -390,22 +393,31 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                     <span className="absolute text-xs">{m.emoji}</span>
                   </div>
 
-                  {/* 左側資訊區：不受右邊擠壓 */}
-                  <div>
-                    <span className="text-[10px] font-bold text-stone-400 block leading-tight">
-                     {m.name}<br />剩餘
-                    </span>
-                    <div className="text-base font-black text-stone-800 mt-1 tracking-tight">
-                       {m.remain > 0 ? (Number.isInteger(m.remain) ? m.remain : m.remain.toFixed(1)) : 0}g
-                    </div>
-                 </div>
-
-                 <div className="text-[9px] text-stone-400 mt-1">
-                   目標 {m.total}g
-                 </div>
-                </div>
-              ))}
+                  {/* 右側圓環進度條與 Emoji */}
+                  <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center">
+                   <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    <path
+                     className="text-stone-100"
+                     strokeWidth="3.5"
+                     stroke="currentColor"
+                     fill="none"
+                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                   />
+                   <path
+                     className={theme?.ring || 'text-amber-500'}
+                     strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
+                     strokeWidth="3.5"
+                     strokeLinecap="round"
+                     stroke="currentColor"
+                     fill="none"
+                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+                <span className="absolute text-xs">{m.emoji}</span>
+              </div>
             </div>
+           ))}
+         </div>
 
             {/* 運動量與消耗 */}
             <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
