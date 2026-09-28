@@ -200,31 +200,69 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
     return Number(localStorage.getItem(`water_${selectedDate}`)) || 0;
   });
   const [steps, setSteps] = useState(() => {
-    return Number(localStorage.getItem(`steps_${selectedDate}`)) || 3500;
+    const saved = localStorage.getItem(`steps_${selectedDate}`);
+    return saved !== null ? Number(saved) : 0;
   });
-  const [selectedExercise, setSelectedExercise] = useState('gym');
-  const [exerciseMinutes, setExerciseMinutes] = useState(45);
+  const [selectedExercise, setSelectedExercise] = useState(() => {
+    return localStorage.getItem(`exercise_${selectedDate}`) || 'none';
+  });
+  const [exerciseMinutes, setExerciseMinutes] = useState(() => {
+    const saved = localStorage.getItem(`exercise_min_${selectedDate}`);
+    return saved !== null ? Number(saved) : 0;
+  });
   const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
+// 1. 當切換日期或進入新的一天時，全面載入該日的獨立紀錄（全新一天自動歸零）
+  useEffect(() => {
+    const savedMeals = localStorage.getItem(`meals_${selectedDate}`);
+    setMeals(savedMeals ? JSON.parse(savedMeals) : []);
+
+    const savedWater = localStorage.getItem(`water_${selectedDate}`);
+    setWaterIntake(savedWater !== null ? Number(savedWater) : 0);
+
+    const savedSteps = localStorage.getItem(`steps_${selectedDate}`);
+    setSteps(savedSteps !== null ? Number(savedSteps) : 0);
+
+    const savedEx = localStorage.getItem(`exercise_${selectedDate}`);
+    setSelectedExercise(savedEx || 'none');
+
+    const savedMin = localStorage.getItem(`exercise_min_${selectedDate}`);
+    setExerciseMinutes(savedMin !== null ? Number(savedMin) : 0);
+  }, [selectedDate]);
+
+  // 2. 自動儲存當日各項紀錄至 localStorage
   useEffect(() => {
     localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
   }, [meals, selectedDate]);
+
   useEffect(() => {
     localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
   }, [waterIntake, selectedDate]);
+
   useEffect(() => {
     localStorage.setItem(`steps_${selectedDate}`, steps.toString());
   }, [steps, selectedDate]);
+
+  useEffect(() => {
+    localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
+  }, [selectedExercise, selectedDate]);
+
+  useEffect(() => {
+    localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
+  }, [exerciseMinutes, selectedDate]);
+
   useEffect(() => {
     localStorage.setItem('user_profile', JSON.stringify(userProfile));
   }, [userProfile]);
+
   useEffect(() => {
     localStorage.setItem('weight_history', JSON.stringify(weightHistory));
   }, [weightHistory]);
+
   useEffect(() => {
     localStorage.setItem('app_theme', themeKey);
   }, [themeKey]);
-
+  
   // 熱量計算
   const consumedCalories = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
   const consumedCarbs = meals.reduce((s, m) => s + (m.macros?.carbs || 0), 0);
