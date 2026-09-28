@@ -1594,11 +1594,17 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
 
   const handleResetCurrentDay = () => {
     if (window.confirm(`確定要徹底清空 ${selectedDate} 當天的飲食、沙盒、步數與運動紀錄嗎？`)) {
+      // 1. 清空當日飲食、沙盒、步數等紀錄
       localStorage.removeItem(`meals_${selectedDate}`);
       localStorage.removeItem(`water_${selectedDate}`);
       localStorage.removeItem(`steps_${selectedDate}`);
       localStorage.removeItem(`exercise_${selectedDate}`);
       localStorage.removeItem(`exercise_min_${selectedDate}`);
+      
+      // 2. 徹底抹除以前殘留的體重假資料
+      localStorage.removeItem('weight_history');
+      localStorage.removeItem('daily_records');
+      
       alert(`${selectedDate} 紀錄已重設歸零！`);
       window.location.reload();
     }
