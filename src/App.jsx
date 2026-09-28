@@ -164,9 +164,9 @@ export default function App() {
           restDay: { calories: 1600, carbs: 160, protein: 110, fat: 50 },
           workoutDay: { calories: 2000, carbs: 230, protein: 135, fat: 55 },
           waterGoal: 2000,
-          weight: 54.5,
-          targetWeight: 50.0,
-          height: 162,
+          weight: 82.9,
+          targetWeight: 65.0,
+          height: 165,
         };
   });
 
@@ -204,7 +204,6 @@ export default function App() {
     }
   };
 
-  // 狀態宣告：預設皆讀取今天 (todayStr) 的獨立資料
   const initialTodayData = readDailyData(todayStr);
   const [meals, setMeals] = useState(initialTodayData.meals);
   const [waterIntake, setWaterIntake] = useState(initialTodayData.water);
@@ -213,16 +212,14 @@ export default function App() {
   const [exerciseMinutes, setExerciseMinutes] = useState(initialTodayData.minutes);
   const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
-  // 切換日期的純淨處理函式
+  // 切換日期的處理函式
   const handleDateChange = (newDate) => {
-    // 1. 先儲存切換前當前日期的最後狀態，確保不丟失
     localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
     localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
     localStorage.setItem(`steps_${selectedDate}`, steps.toString());
     localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
     localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
 
-    // 2. 載入新日期的獨立資料（如果是全新的日子，就會乾淨歸零！）
     const data = readDailyData(newDate);
     setMeals(data.meals);
     setWaterIntake(data.water);
@@ -230,11 +227,9 @@ export default function App() {
     setSelectedExercise(data.exercise);
     setExerciseMinutes(data.minutes);
 
-    // 3. 更新當前日期
     setSelectedDate(newDate);
   };
 
-  // 即時資料自動儲存至當前 selectedDate 的 Key
   useEffect(() => {
     localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
   }, [meals, selectedDate]);
@@ -361,7 +356,6 @@ export default function App() {
               </div>
             )}
 
-            {/* 加入 key={selectedDate}：切換日期時銷毀舊沙盒，徹底重新初始化物理世界 */}
             <PhysicsBox key={selectedDate} items={meals} onSelectItem={(meal) => setSelectedMealDetail(meal)} />
 
             {/* 每日熱量儀表板 */}
@@ -595,6 +589,7 @@ export default function App() {
         {activeTab === 'trends' && (
           <TrendsView
             userProfile={userProfile}
+            setUserProfile={setUserProfile}
             weightHistory={weightHistory}
             onUpdateWeight={handleUpdateWeight}
             theme={theme}
@@ -824,7 +819,7 @@ function AddMealView({ theme, onMealLogged }) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
 
-        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+        const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
         let lastError = null;
 
         for (const modelName of candidateModels) {
@@ -891,7 +886,7 @@ function AddMealView({ theme, onMealLogged }) {
             <div className="absolute bottom-2 right-2 flex gap-1">
               <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
                 📷 重拍
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+                <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
               </label>
               <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
                 🖼️ 重選
@@ -903,19 +898,7 @@ function AddMealView({ theme, onMealLogged }) {
           <div className="w-full flex gap-3">
             <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
               <span className="text-3xl">📷</span>
-              <span className="text-xs font-bold text-amber-800">直接拍照</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/heic,image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleCapture}
-              />
-            </label>
-
-            <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
-              <span className="text-3xl">🖼️</span>
-              <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
+              <span className="text-xs font-bold text-amber-800">拍照或選圖</span>
               <input
                 type="file"
                 accept="image/*"
@@ -1084,7 +1067,7 @@ function AICoachView({ theme, statusContext }) {
 
 請用活潑可愛、排版清晰的口氣回答，適當使用列點與可愛 Emoji，讓使用者看了食慾與心情都超好喵！`;
 
-      const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+      const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
       let replyText = null;
       let lastError = null;
 
@@ -1217,27 +1200,19 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
   const [timeSpan, setTimeSpan] = useState('week');
   const [showWeightInput, setShowWeightInput] = useState(false);
 
-  const currentWeight = Number(userProfile?.weight) || 55;
-  const userHeight = Number(userProfile?.height) || 160;
+  const currentWeight = Number(userProfile?.weight) || 82.9;
+  const userHeight = Number(userProfile?.height) || 165;
   const waterGoal = Number(userProfile?.waterGoal) || 2000;
   const primaryTheme = theme?.primary || 'bg-amber-500 text-white';
 
   const [targetWeight, setTargetWeight] = useState(() => {
-    return Number(userProfile?.targetWeight) || Number(localStorage.getItem('target_weight')) || 50;
+    return Number(userProfile?.targetWeight) || Number(localStorage.getItem('target_weight')) || 65;
   });
 
   const [inputWeightVal, setInputWeightVal] = useState(currentWeight.toString());
   const [inputTargetWeightVal, setInputTargetWeightVal] = useState(targetWeight.toString());
 
   const currentBMI = (currentWeight / Math.pow(userHeight / 100, 2)).toFixed(1);
-
-  // 安全讀取歷史紀錄
-  let storedDaily = {};
-  try {
-    storedDaily = JSON.parse(localStorage.getItem('daily_records') || '{}');
-  } catch (e) {
-    storedDaily = {};
-  }
 
   const getDayConfig = () => {
     const list = [];
@@ -1251,15 +1226,21 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
     return {
       labels: list.map((item) => item.label),
       weights: list.map((item) => {
-        return weightHistory[item.date] || storedDaily[item.date]?.weight || (item.label === '今天' ? currentWeight : null);
+        if (weightHistory && weightHistory[item.date]) {
+          return Number(weightHistory[item.date]);
+        }
+        if (item.label === '今天' && currentWeight) {
+          return currentWeight;
+        }
+        return null;
       }),
       waters: list.map((item) => {
         const val = localStorage.getItem(`water_${item.date}`);
-        return val !== null ? Number(val) : (storedDaily[item.date]?.water ?? null);
+        return val !== null && Number(val) > 0 ? Number(val) : null;
       }),
       steps: list.map((item) => {
         const val = localStorage.getItem(`steps_${item.date}`);
-        return val !== null ? Number(val) : (storedDaily[item.date]?.steps ?? null);
+        return val !== null && Number(val) > 0 ? Number(val) : null;
       }),
       desc: '近 3 天變化',
     };
@@ -1277,15 +1258,21 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
     return {
       labels: list.map((item) => item.label),
       weights: list.map((item) => {
-        return weightHistory[item.date] || storedDaily[item.date]?.weight || (item.label === '今天' ? currentWeight : null);
+        if (weightHistory && weightHistory[item.date]) {
+          return Number(weightHistory[item.date]);
+        }
+        if (item.label === '今天' && currentWeight) {
+          return currentWeight;
+        }
+        return null;
       }),
       waters: list.map((item) => {
         const val = localStorage.getItem(`water_${item.date}`);
-        return val !== null ? Number(val) : (storedDaily[item.date]?.water ?? null);
+        return val !== null && Number(val) > 0 ? Number(val) : null;
       }),
       steps: list.map((item) => {
         const val = localStorage.getItem(`steps_${item.date}`);
-        return val !== null ? Number(val) : (storedDaily[item.date]?.steps ?? null);
+        return val !== null && Number(val) > 0 ? Number(val) : null;
       }),
       desc: '近 7 天走勢',
     };
@@ -1340,7 +1327,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
       const updatedProfile = {
         ...existingProfile,
         ...(userProfile || {}),
-        weight: !isNaN(w) ? w : (userProfile?.weight || 55),
+        weight: !isNaN(w) ? w : (userProfile?.weight || 82.9),
         targetWeight: tw,
       };
 
@@ -1355,7 +1342,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
 
   const validWeights = currentConfig.weights.filter((v) => v !== null && !isNaN(v));
   const minW = validWeights.length > 0 ? Math.min(...validWeights) - 0.5 : 40;
-  const maxW = validWeights.length > 0 ? Math.max(...validWeights) + 0.5 : 80;
+  const maxW = validWeights.length > 0 ? Math.max(...validWeights) + 0.5 : 90;
   const rangeW = maxW - minW || 1;
 
   return (
@@ -1579,32 +1566,37 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
 }
 
 /* =========================================================================
-   設定視圖 (內建清空今日快取按鈕)
+   設定視圖 (含個人身體數據與重設功能)
    ========================================================================= */
 function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, selectedDate }) {
   const [profile, setProfile] = useState(userProfile);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
 
+  useEffect(() => {
+    setProfile(userProfile);
+  }, [userProfile]);
+
   const handleSave = () => {
     setUserProfile(profile);
+    localStorage.setItem('user_profile', JSON.stringify(profile));
+    if (profile.targetWeight) {
+      localStorage.setItem('target_weight', profile.targetWeight.toString());
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
   };
 
   const handleResetCurrentDay = () => {
-    if (window.confirm(`確定要徹底清空 ${selectedDate} 當天的飲食、沙盒、步數與運動紀錄嗎？`)) {
-      // 1. 清空當日飲食、沙盒、步數等紀錄
+    if (window.confirm(`確定要徹底清空 ${selectedDate} 紀錄與殘留快取嗎？`)) {
       localStorage.removeItem(`meals_${selectedDate}`);
       localStorage.removeItem(`water_${selectedDate}`);
       localStorage.removeItem(`steps_${selectedDate}`);
       localStorage.removeItem(`exercise_${selectedDate}`);
       localStorage.removeItem(`exercise_min_${selectedDate}`);
-      
-      // 2. 徹底抹除以前殘留的體重假資料
       localStorage.removeItem('weight_history');
       localStorage.removeItem('daily_records');
-      
+
       alert(`${selectedDate} 紀錄已重設歸零！`);
       window.location.reload();
     }
@@ -1687,65 +1679,65 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
       </div>
 
       {/* 👤 個人基本身體數據 */}
-     <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
-      <span className="text-xs font-bold text-stone-700">👤 個人身體數據 (計算 BMI 與每日基準)</span>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-       <div>
-         <label className="text-[10px] text-stone-400 font-bold block">身高 (cm)</label>
-         <input
-           type="number"
-           step="0.1"
-           value={profile.height || ''}
-           onChange={(e) =>
-             setProfile({ ...profile, height: Number(e.target.value) })
-          }
-          placeholder="例如 160"
-          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-        />
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
+        <span className="text-xs font-bold text-stone-700">👤 個人身體數據 (計算 BMI 與每日基準)</span>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="text-[10px] text-stone-400 font-bold block">身高 (cm)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={profile.height || ''}
+              onChange={(e) =>
+                setProfile({ ...profile, height: Number(e.target.value) })
+              }
+              placeholder="例如 165"
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400 font-bold block">目前體重 (kg)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={profile.weight || ''}
+              onChange={(e) =>
+                setProfile({ ...profile, weight: Number(e.target.value) })
+              }
+              placeholder="例如 82.9"
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400 font-bold block">目標體重 (kg)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={profile.targetWeight || ''}
+              onChange={(e) =>
+                setProfile({ ...profile, targetWeight: Number(e.target.value) })
+              }
+              placeholder="例如 65"
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400 font-bold block">每日飲水目標 (ml)</label>
+            <input
+              type="number"
+              step="50"
+              value={profile.waterGoal || ''}
+              onChange={(e) =>
+                setProfile({ ...profile, waterGoal: Number(e.target.value) })
+              }
+              placeholder="例如 2000"
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+        </div>
       </div>
-      <div>
-        <label className="text-[10px] text-stone-400 font-bold block">目前體重 (kg)</label>
-        <input
-          type="number"
-          step="0.1"
-          value={profile.weight || ''}
-          onChange={(e) =>
-            setProfile({ ...profile, weight: Number(e.target.value) })
-          }
-          placeholder="例如 52"
-          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-        />
-      </div>
-      <div>
-         <label className="text-[10px] text-stone-400 font-bold block">目標體重 (kg)</label>
-         <input
-          type="number"
-          step="0.1"
-          value={profile.targetWeight || ''}
-          onChange={(e) =>
-            setProfile({ ...profile, targetWeight: Number(e.target.value) })
-          }
-          placeholder="例如 48"
-          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-        />
-      </div>
-      <div>
-        <label className="text-[10px] text-stone-400 font-bold block">每日飲水目標 (ml)</label>
-        <input
-          type="number"
-          step="50"
-          value={profile.waterGoal || ''}
-          onChange={(e) =>
-            setProfile({ ...profile, waterGoal: Number(e.target.value) })
-          }
-          placeholder="例如 2000"
-          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-        />
-      </div>
-    </div>
-  </div>
 
-      {/* 休息日目標 */}
+      {/* ☕ 休息日目標 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
         <span className="text-xs font-bold text-stone-700">☕ 休息日 (Rest Day) 目標設定</span>
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1796,7 +1788,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
         </div>
       </div>
 
-      {/* 運動日目標 */}
+      {/* ⚡ 運動日目標 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
         <span className="text-xs font-bold text-orange-600">⚡ 運動日 (Workout Day) 目標設定</span>
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1853,7 +1845,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
         onClick={handleResetCurrentDay}
         className="w-full py-3 rounded-2xl font-bold text-xs bg-red-50 text-red-600 border border-red-200 active:scale-95 transition cursor-pointer"
       >
-        🗑️ 清空 {selectedDate} 紀錄（重設為 0）
+        🗑️ 清空當天紀錄與快取歷史（重設）
       </button>
 
       <button
