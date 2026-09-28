@@ -1680,6 +1680,65 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
         <span className="text-sm font-bold text-stone-300">❯</span>
       </div>
 
+      {/* 👤 個人基本身體數據 */}
+     <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
+      <span className="text-xs font-bold text-stone-700">👤 個人身體數據 (計算 BMI 與每日基準)</span>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+       <div>
+         <label className="text-[10px] text-stone-400 font-bold block">身高 (cm)</label>
+         <input
+           type="number"
+           step="0.1"
+           value={profile.height || ''}
+           onChange={(e) =>
+             setProfile({ ...profile, height: Number(e.target.value) })
+          }
+          placeholder="例如 160"
+          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] text-stone-400 font-bold block">目前體重 (kg)</label>
+        <input
+          type="number"
+          step="0.1"
+          value={profile.weight || ''}
+          onChange={(e) =>
+            setProfile({ ...profile, weight: Number(e.target.value) })
+          }
+          placeholder="例如 52"
+          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+        />
+      </div>
+      <div>
+         <label className="text-[10px] text-stone-400 font-bold block">目標體重 (kg)</label>
+         <input
+          type="number"
+          step="0.1"
+          value={profile.targetWeight || ''}
+          onChange={(e) =>
+            setProfile({ ...profile, targetWeight: Number(e.target.value) })
+          }
+          placeholder="例如 48"
+          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+        />
+      </div>
+      <div>
+        <label className="text-[10px] text-stone-400 font-bold block">每日飲水目標 (ml)</label>
+        <input
+          type="number"
+          step="50"
+          value={profile.waterGoal || ''}
+          onChange={(e) =>
+            setProfile({ ...profile, waterGoal: Number(e.target.value) })
+          }
+          placeholder="例如 2000"
+          className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+        />
+      </div>
+    </div>
+  </div>
+
       {/* 休息日目標 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
         <span className="text-xs font-bold text-stone-700">☕ 休息日 (Rest Day) 目標設定</span>
