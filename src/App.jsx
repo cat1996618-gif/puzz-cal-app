@@ -192,76 +192,85 @@ const getLocalDateString = (d = new Date()) => {
 const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const [meals, setMeals] = useState(() => {
-    const saved = localStorage.getItem(`meals_${selectedDate}`);
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [waterIntake, setWaterIntake] = useState(() => {
-    return Number(localStorage.getItem(`water_${selectedDate}`)) || 0;
-  });
-  const [steps, setSteps] = useState(() => {
-    const saved = localStorage.getItem(`steps_${selectedDate}`);
-    return saved !== null ? Number(saved) : 0;
-  });
-  const [selectedExercise, setSelectedExercise] = useState(() => {
-    return localStorage.getItem(`exercise_${selectedDate}`) || 'none';
-  });
-  const [exerciseMinutes, setExerciseMinutes] = useState(() => {
-    const saved = localStorage.getItem(`exercise_min_${selectedDate}`);
-    return saved !== null ? Number(saved) : 0;
-  });
-  const [selectedMealDetail, setSelectedMealDetail] = useState(null);
+ // 初始值全從當日 localStorage 讀取
+const [meals, setMeals] = useState(() => {
+  const today = getLocalDateString();
+  const saved = localStorage.getItem(`meals_${today}`);
+  return saved ? JSON.parse(saved) : [];
+});
+const [waterIntake, setWaterIntake] = useState(() => {
+  const today = getLocalDateString();
+  const saved = localStorage.getItem(`water_${today}`);
+  return saved !== null ? Number(saved) : 0;
+});
+const [steps, setSteps] = useState(() => {
+  const today = getLocalDateString();
+  const saved = localStorage.getItem(`steps_${today}`);
+  return saved !== null ? Number(saved) : 0;
+});
+const [selectedExercise, setSelectedExercise] = useState(() => {
+  const today = getLocalDateString();
+  return localStorage.getItem(`exercise_${today}`) || 'none';
+});
+const [exerciseMinutes, setExerciseMinutes] = useState(() => {
+  const today = getLocalDateString();
+  const saved = localStorage.getItem(`exercise_min_${today}`);
+  return saved !== null ? Number(saved) : 0;
+});
+const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
-// 1. 當切換日期或進入新的一天時，全面載入該日的獨立紀錄（全新一天自動歸零）
-  useEffect(() => {
-    const savedMeals = localStorage.getItem(`meals_${selectedDate}`);
-    setMeals(savedMeals ? JSON.parse(savedMeals) : []);
+// 切換日期的專屬函式：先載入新日期的資料，再切換日期狀態
+const handleDateChange = (newDate) => {
+  setSelectedDate(newDate);
 
-    const savedWater = localStorage.getItem(`water_${selectedDate}`);
-    setWaterIntake(savedWater !== null ? Number(savedWater) : 0);
+  const savedMeals = localStorage.getItem(`meals_${newDate}`);
+  setMeals(savedMeals ? JSON.parse(savedMeals) : []);
 
-    const savedSteps = localStorage.getItem(`steps_${selectedDate}`);
-    setSteps(savedSteps !== null ? Number(savedSteps) : 0);
+  const savedWater = localStorage.getItem(`water_${newDate}`);
+  setWaterIntake(savedWater !== null ? Number(savedWater) : 0);
 
-    const savedEx = localStorage.getItem(`exercise_${selectedDate}`);
-    setSelectedExercise(savedEx || 'none');
+  const savedSteps = localStorage.getItem(`steps_${newDate}`);
+  setSteps(savedSteps !== null ? Number(savedSteps) : 0);
 
-    const savedMin = localStorage.getItem(`exercise_min_${selectedDate}`);
-    setExerciseMinutes(savedMin !== null ? Number(savedMin) : 0);
-  }, [selectedDate]);
+  const savedEx = localStorage.getItem(`exercise_${newDate}`);
+  setSelectedExercise(savedEx || 'none');
 
-  // 2. 自動儲存當日各項紀錄至 localStorage
-  useEffect(() => {
-    localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
-  }, [meals, selectedDate]);
+  const savedMin = localStorage.getItem(`exercise_min_${newDate}`);
+  setExerciseMinutes(savedMin !== null ? Number(savedMin) : 0);
+};
 
-  useEffect(() => {
-    localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
-  }, [waterIntake, selectedDate]);
+// 儲存：只在值改變時存入當前 selectedDate（移除原本那個會衝突的載入 useEffect）
+useEffect(() => {
+  localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+}, [meals]);
 
-  useEffect(() => {
-    localStorage.setItem(`steps_${selectedDate}`, steps.toString());
-  }, [steps, selectedDate]);
+useEffect(() => {
+  localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
+}, [waterIntake]);
 
-  useEffect(() => {
-    localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
-  }, [selectedExercise, selectedDate]);
+useEffect(() => {
+  localStorage.setItem(`steps_${selectedDate}`, steps.toString());
+}, [steps]);
 
-  useEffect(() => {
-    localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
-  }, [exerciseMinutes, selectedDate]);
+useEffect(() => {
+  localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
+}, [selectedExercise]);
 
-  useEffect(() => {
-    localStorage.setItem('user_profile', JSON.stringify(userProfile));
-  }, [userProfile]);
+useEffect(() => {
+  localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
+}, [exerciseMinutes]);
 
-  useEffect(() => {
-    localStorage.setItem('weight_history', JSON.stringify(weightHistory));
-  }, [weightHistory]);
+useEffect(() => {
+  localStorage.setItem('user_profile', JSON.stringify(userProfile));
+}, [userProfile]);
 
-  useEffect(() => {
-    localStorage.setItem('app_theme', themeKey);
-  }, [themeKey]);
+useEffect(() => {
+  localStorage.setItem('weight_history', JSON.stringify(weightHistory));
+}, [weightHistory]);
+
+useEffect(() => {
+  localStorage.setItem('app_theme', themeKey);
+}, [themeKey]);
   
   // 熱量計算
   const consumedCalories = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
@@ -333,14 +342,14 @@ const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
                     type="date"
                     value={selectedDate}
                     onChange={(e) => {
-                      if (e.target.value) setSelectedDate(e.target.value);
+                      if (e.target.value) handleDateChange(e.target.value);
                     }}
                     className="border border-stone-200 rounded-2xl p-3 text-sm outline-none focus:ring-2 focus:ring-amber-400"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => {
-                        setSelectedDate(getLocalDateString());
+                        handleDateChange(getLocalDateString());
                         setShowDatePicker(false);
                       }}
                       className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-stone-100 text-stone-600"
