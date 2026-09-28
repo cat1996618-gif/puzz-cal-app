@@ -820,31 +820,6 @@ function AddMealView({ theme, onMealLogged }) {
       } else {
         if (!genAI) throw new Error('未偵測到 Gemini API Key，請先在設定中填入金鑰！');
 
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash',
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: SchemaType.OBJECT,
-              properties: {
-                meal_name: { type: SchemaType.STRING },
-                total_calories: { type: SchemaType.NUMBER },
-                macros: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    carbs: { type: SchemaType.NUMBER },
-                    protein: { type: SchemaType.NUMBER },
-                    fat: { type: SchemaType.NUMBER },
-                  },
-                  required: ['carbs', 'protein', 'fat'],
-                },
-                advice: { type: SchemaType.STRING },
-              },
-              required: ['meal_name', 'total_calories', 'macros'],
-            },
-          },
-        });
-
         const prompt =
           activeMode === 'recipe'
             ? `使用者自己煮了這道菜：${mealName || '自製料理'}。詳細食材與重量：\n${recipeText}\n請精算總熱量、碳水、蛋白質、油脂(g)。`
@@ -854,14 +829,57 @@ function AddMealView({ theme, onMealLogged }) {
         if (photoBase64) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
+       // 輪流嘗試：優先使用 gemini-2.5-flash，若有問題自動無縫切換到 gemini-3.8-flash
+        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+        let lastError = null;
 
-        const resp = await model.generateContent(parts);
-        const data = JSON.parse(resp.response.text());
-        result = { ...data, photoUrl: photoPreview };
+        for (const modelName of candidateModels) {
+          try {
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    meal_name: { type: SchemaType.STRING },
+                    total_calories: { type: SchemaType.NUMBER },
+                    macros: {
+                      type: SchemaType.OBJECT,
+                      properties: {
+                        carbs: { type: SchemaType.NUMBER },
+                        protein: { type: SchemaType.NUMBER },
+                        fat: { type: SchemaType.NUMBER },
+                      },
+                      required: ['carbs', 'protein', 'fat'],
+                    },
+                    advice: { type: SchemaType.STRING },
+                  },
+                  required: ['meal_name', 'total_calories', 'macros'],
+                },
+              },
+            });
+
+            const resp = await model.generateContent(parts);
+            const data = JSON.parse(resp.response.text());
+            result = { ...data, photoUrl: photoPreview };
+            break; // 成功解析就直接跳出迴圈
+          } catch (err) {
+            console.warn(`模型 ${modelName} 呼叫失敗，嘗試備用模型...`, err);
+            lastError = err;
+            // 如果撞到 429 限制，稍微暫停 1 秒再切換
+            if (err.message?.includes('429')) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+        }
+        
+      if (!result) {
+        throw lastError || new Error('AI 分析失敗，請稍候重試！');
+       }
       }
-
       if (result) onMealLogged(result);
-    } catch (err) {
+   } catch (err) {
       console.error(err);
       alert('計算失敗：' + (err.message || '請確認 API Key！'));
     } finally {
@@ -1058,7 +1076,6 @@ function AICoachView({ theme, statusContext }) {
     try {
       if (!genAI) throw new Error('喵！找不到 API Key，請在設定確認一下金鑰喔～');
 
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       const cutePrompt = `你是一隻熱愛美食、溫柔又專業的貓咪營養教練，名字叫「喵卡（MewCal）」🐾。
 你的說話風格：
 1. 語氣超級可愛、暖心、元氣滿滿，句尾常自然地帶「喵～」、「(=^･ω･^=)」、「✨」、「🐾」。
@@ -1077,8 +1094,30 @@ function AICoachView({ theme, statusContext }) {
 
 請用活潑可愛、排版清晰的口氣回答，適當使用列點與可愛 Emoji，讓使用者看了食慾與心情都超好喵！`;
 
-      const resp = await model.generateContent(cutePrompt);
-      setMessages([...newMsgs, { role: 'assistant', text: resp.response.text() }]);
+      const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+      let replyText = null;
+      let lastError = null;
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const resp = await model.generateContent(cutePrompt);
+          replyText = resp.response.text();
+          break;
+        } catch (err) {
+          console.warn(`貓貓教練呼叫 ${modelName} 失敗，嘗試備用模型...`, err);
+          lastError = err;
+          if (err.message?.includes('429')) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+      }
+
+      if (!replyText) {
+        throw lastError || new Error('貓貓暫時分心了，請再問一次喵！');
+      }
+
+      setMessages([...newMsgs, { role: 'assistant', text: replyText }]);
       setCatMood('cheering');
     } catch (err) {
       setMessages([...newMsgs, { role: 'assistant', text: `嗚喵...訊號被毛線球纏住了(つд⊂)：${err.message}` }]);
