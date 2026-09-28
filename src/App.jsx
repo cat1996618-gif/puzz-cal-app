@@ -7,7 +7,7 @@ import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-// 8 款完整主題，每款都擁有專屬的一整套導覽列 Emoji！
+// 8 款完整主題
 const THEMES = {
   cookie: {
     id: 'cookie',
@@ -141,13 +141,21 @@ const EXERCISE_TYPES = [
   { id: 'swim', name: '游泳訓練', emoji: '🏊', calPerMin: 8.5 },
 ];
 
+// 本地年月日格式化 YYYY-MM-DD
+const getLocalDateString = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [themeKey, setThemeKey] = useState(() => localStorage.getItem('app_theme') || 'cookie');
   const theme = THEMES[themeKey] || THEMES.cookie;
   const [showThemeModal, setShowThemeModal] = useState(false);
 
-  // 使用者設定
+  // 使用者基本檔案
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('user_profile');
     return saved
@@ -162,116 +170,103 @@ export default function App() {
         };
   });
 
-  // 體重歷史記錄庫（按日期）
   const [weightHistory, setWeightHistory] = useState(() => {
     const saved = localStorage.getItem('weight_history');
-    return saved
-      ? JSON.parse(saved)
-      : {
-          '2026-09-21': 55.2,
-          '2026-09-22': 55.0,
-          '2026-09-23': 54.8,
-          '2026-09-24': 54.9,
-          '2026-09-25': 54.6,
-          '2026-09-26': 54.7,
-          '2026-09-27': 54.5,
-        };
+    return saved ? JSON.parse(saved) : {};
   });
 
   const [dayType, setDayType] = useState('rest');
   const currentTarget = dayType === 'workout' ? userProfile.workoutDay : userProfile.restDay;
 
-  // 取得本地年月日 YYYY-MM-DD
-const getLocalDateString = (d = new Date()) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
+  // 當前選擇日期
+  const todayStr = getLocalDateString();
+  const [selectedDate, setSelectedDate] = useState(todayStr);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
- // 初始值全從當日 localStorage 讀取
-const [meals, setMeals] = useState(() => {
-  const today = getLocalDateString();
-  const saved = localStorage.getItem(`meals_${today}`);
-  return saved ? JSON.parse(saved) : [];
-});
-const [waterIntake, setWaterIntake] = useState(() => {
-  const today = getLocalDateString();
-  const saved = localStorage.getItem(`water_${today}`);
-  return saved !== null ? Number(saved) : 0;
-});
-const [steps, setSteps] = useState(() => {
-  const today = getLocalDateString();
-  const saved = localStorage.getItem(`steps_${today}`);
-  return saved !== null ? Number(saved) : 0;
-});
-const [selectedExercise, setSelectedExercise] = useState(() => {
-  const today = getLocalDateString();
-  return localStorage.getItem(`exercise_${today}`) || 'none';
-});
-const [exerciseMinutes, setExerciseMinutes] = useState(() => {
-  const today = getLocalDateString();
-  const saved = localStorage.getItem(`exercise_min_${today}`);
-  return saved !== null ? Number(saved) : 0;
-});
-const [selectedMealDetail, setSelectedMealDetail] = useState(null);
+  // 獨立載入特定日期資料的 Helper 函式
+  const readDailyData = (date) => {
+    try {
+      const savedMeals = localStorage.getItem(`meals_${date}`);
+      const savedWater = localStorage.getItem(`water_${date}`);
+      const savedSteps = localStorage.getItem(`steps_${date}`);
+      const savedEx = localStorage.getItem(`exercise_${date}`);
+      const savedMin = localStorage.getItem(`exercise_min_${date}`);
 
-// 切換日期的專屬函式：先載入新日期的資料，再切換日期狀態
-const handleDateChange = (newDate) => {
-  setSelectedDate(newDate);
+      return {
+        meals: savedMeals ? JSON.parse(savedMeals) : [],
+        water: savedWater !== null ? Number(savedWater) : 0,
+        steps: savedSteps !== null ? Number(savedSteps) : 0,
+        exercise: savedEx || 'none',
+        minutes: savedMin !== null ? Number(savedMin) : 0,
+      };
+    } catch (e) {
+      return { meals: [], water: 0, steps: 0, exercise: 'none', minutes: 0 };
+    }
+  };
 
-  const savedMeals = localStorage.getItem(`meals_${newDate}`);
-  setMeals(savedMeals ? JSON.parse(savedMeals) : []);
+  // 狀態宣告：預設皆讀取今天 (todayStr) 的獨立資料
+  const initialTodayData = readDailyData(todayStr);
+  const [meals, setMeals] = useState(initialTodayData.meals);
+  const [waterIntake, setWaterIntake] = useState(initialTodayData.water);
+  const [steps, setSteps] = useState(initialTodayData.steps);
+  const [selectedExercise, setSelectedExercise] = useState(initialTodayData.exercise);
+  const [exerciseMinutes, setExerciseMinutes] = useState(initialTodayData.minutes);
+  const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
-  const savedWater = localStorage.getItem(`water_${newDate}`);
-  setWaterIntake(savedWater !== null ? Number(savedWater) : 0);
+  // 切換日期的純淨處理函式
+  const handleDateChange = (newDate) => {
+    // 1. 先儲存切換前當前日期的最後狀態，確保不丟失
+    localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+    localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
+    localStorage.setItem(`steps_${selectedDate}`, steps.toString());
+    localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
+    localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
 
-  const savedSteps = localStorage.getItem(`steps_${newDate}`);
-  setSteps(savedSteps !== null ? Number(savedSteps) : 0);
+    // 2. 載入新日期的獨立資料（如果是全新的日子，就會乾淨歸零！）
+    const data = readDailyData(newDate);
+    setMeals(data.meals);
+    setWaterIntake(data.water);
+    setSteps(data.steps);
+    setSelectedExercise(data.exercise);
+    setExerciseMinutes(data.minutes);
 
-  const savedEx = localStorage.getItem(`exercise_${newDate}`);
-  setSelectedExercise(savedEx || 'none');
+    // 3. 更新當前日期
+    setSelectedDate(newDate);
+  };
 
-  const savedMin = localStorage.getItem(`exercise_min_${newDate}`);
-  setExerciseMinutes(savedMin !== null ? Number(savedMin) : 0);
-};
+  // 即時資料自動儲存至當前 selectedDate 的 Key
+  useEffect(() => {
+    localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+  }, [meals, selectedDate]);
 
-// 儲存：只在值改變時存入當前 selectedDate（移除原本那個會衝突的載入 useEffect）
-useEffect(() => {
-  localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
-}, [meals]);
+  useEffect(() => {
+    localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
+  }, [waterIntake, selectedDate]);
 
-useEffect(() => {
-  localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
-}, [waterIntake]);
+  useEffect(() => {
+    localStorage.setItem(`steps_${selectedDate}`, steps.toString());
+  }, [steps, selectedDate]);
 
-useEffect(() => {
-  localStorage.setItem(`steps_${selectedDate}`, steps.toString());
-}, [steps]);
+  useEffect(() => {
+    localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
+  }, [selectedExercise, selectedDate]);
 
-useEffect(() => {
-  localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
-}, [selectedExercise]);
+  useEffect(() => {
+    localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
+  }, [exerciseMinutes, selectedDate]);
 
-useEffect(() => {
-  localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
-}, [exerciseMinutes]);
+  useEffect(() => {
+    localStorage.setItem('user_profile', JSON.stringify(userProfile));
+  }, [userProfile]);
 
-useEffect(() => {
-  localStorage.setItem('user_profile', JSON.stringify(userProfile));
-}, [userProfile]);
+  useEffect(() => {
+    localStorage.setItem('weight_history', JSON.stringify(weightHistory));
+  }, [weightHistory]);
 
-useEffect(() => {
-  localStorage.setItem('weight_history', JSON.stringify(weightHistory));
-}, [weightHistory]);
+  useEffect(() => {
+    localStorage.setItem('app_theme', themeKey);
+  }, [themeKey]);
 
-useEffect(() => {
-  localStorage.setItem('app_theme', themeKey);
-}, [themeKey]);
-  
   // 熱量計算
   const consumedCalories = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
   const consumedCarbs = meals.reduce((s, m) => s + (m.macros?.carbs || 0), 0);
@@ -290,12 +285,11 @@ useEffect(() => {
 
   const formattedDateString = (() => {
     const [y, m, d] = selectedDate.split('-').map(Number);
-    const localDate = new Date(y, m - 1, d); // 依本地年月日建立
+    const localDate = new Date(y, m - 1, d);
     const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
     return `${m}月${d}日 ${weekdays[localDate.getDay()]}`;
   })();
 
-  // 登記新體重
   const handleUpdateWeight = (newWeight) => {
     const w = parseFloat(newWeight);
     if (!w || isNaN(w)) return;
@@ -367,7 +361,8 @@ useEffect(() => {
               </div>
             )}
 
-            <PhysicsBox items={meals} onSelectItem={(meal) => setSelectedMealDetail(meal)} />
+            {/* 加入 key={selectedDate}：切換日期時銷毀舊沙盒，徹底重新初始化物理世界 */}
+            <PhysicsBox key={selectedDate} items={meals} onSelectItem={(meal) => setSelectedMealDetail(meal)} />
 
             {/* 每日熱量儀表板 */}
             <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between">
@@ -413,18 +408,16 @@ useEffect(() => {
                 { name: '蛋白質', emoji: '🥩', remain: remainProtein, total: currentTarget.protein, consumed: consumedProtein },
                 { name: '油脂', emoji: '🥑', remain: remainFat, total: currentTarget.fat, consumed: consumedFat },
               ].map((m, idx) => (
-                 <div key={idx} className="bg-white p-2.5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between">
-                   {/* 左側數值資訊 */}
-                   <div className="flex flex-col">
-                     <span className="text-[10px] font-bold text-stone-400 leading-tight">
-                       {m.name}<br />剩餘
+                <div key={idx} className="bg-white p-2.5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-stone-400 leading-tight">
+                      {m.name}<br />剩餘
                     </span>
                     <div className="text-base font-black text-stone-800 my-0.5 tracking-tight">
                       {m.remain > 0 ? (Number.isInteger(m.remain) ? m.remain : m.remain.toFixed(1)) : 0}g
                     </div>
                     <span className="text-[9px] text-stone-400">目標 {m.total}g</span>
-                </div>
-                  {/* 右側圓環進度條（只保留這裡的 Emoji） */}
+                  </div>
                   <div className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                       <path
@@ -433,16 +426,16 @@ useEffect(() => {
                         stroke="currentColor"
                         fill="none"
                         d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                     />
-                    <path
-                      className={theme?.ring || 'text-amber-500'}
-                      strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />  
+                      />
+                      <path
+                        className={theme?.ring || 'text-amber-500'}
+                        strokeDasharray={`${Math.min((m.consumed / m.total) * 100, 100)}, 100`}
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
                     </svg>
                     <span className="absolute text-sm select-none">{m.emoji}</span>
                   </div>
@@ -489,9 +482,9 @@ useEffect(() => {
                       const val = e.target.value;
                       setSelectedExercise(val);
                       if (val === 'none') {
-                        setExerciseMinutes(0); // 選無運動時自動歸零時間與消耗
+                        setExerciseMinutes(0);
                       } else if (exerciseMinutes === 0) {
-                        setExerciseMinutes(30); // 若切回其他運動且原本是0，自動預設30分鐘
+                        setExerciseMinutes(30);
                       }
                     }}
                     className="text-xs font-bold bg-stone-50 border border-stone-200 rounded-xl p-1 mt-0.5 outline-none"
@@ -503,23 +496,22 @@ useEffect(() => {
                     ))}
                   </select>
 
-                  {/* 如果選「無運動」，顯示「好好休息」，其餘運動才顯示分鐘輸入框 */}
                   <div className="flex items-center gap-1 mt-1">
                     {selectedExercise === 'none' ? (
-                       <span className="text-[10px] text-stone-400 py-0.5">今天好好休息 ☕</span>
-                     ) : (
-                       <>
-                         <input
+                      <span className="text-[10px] text-stone-400 py-0.5">今天好好休息 ☕</span>
+                    ) : (
+                      <>
+                        <input
                           type="number"
                           value={exerciseMinutes}
                           onChange={(e) => setExerciseMinutes(Number(e.target.value))}
                           className="w-10 text-xs font-bold border-b text-center border-stone-200 outline-none"
-                         />
-                         <span className="text-[10px] text-stone-400">分鐘</span>
-                       </>
-                      )}
-                    </div>
+                        />
+                        <span className="text-[10px] text-stone-400">分鐘</span>
+                      </>
+                    )}
                   </div>
+                </div>
 
                 <div className="flex flex-col items-end">
                   <span className="text-[11px] text-stone-400">總消耗</span>
@@ -599,7 +591,7 @@ useEffect(() => {
           </>
         )}
 
-        {/* ===================== 2. 趨勢 (支援輸入體重與日週月年真實切換) ===================== */}
+        {/* ===================== 2. 趨勢 ===================== */}
         {activeTab === 'trends' && (
           <TrendsView
             userProfile={userProfile}
@@ -627,7 +619,7 @@ useEffect(() => {
           />
         )}
 
-        {/* ===================== 4. 超可愛貓貓營養建議 ===================== */}
+        {/* ===================== 4. 貓貓教練 ===================== */}
         {activeTab === 'coach' && (
           <AICoachView
             theme={theme}
@@ -650,11 +642,12 @@ useEffect(() => {
             onOpenThemeModal={() => setShowThemeModal(true)}
             userProfile={userProfile}
             setUserProfile={setUserProfile}
+            selectedDate={selectedDate}
           />
         )}
       </div>
 
-      {/* 底部懸浮導覽列：文字固定，Emoji 隨主題華麗變換！ */}
+      {/* 底部導覽列 */}
       <nav className="fixed bottom-4 inset-x-4 max-w-md mx-auto glass rounded-3xl border border-white/60 shadow-xl p-2 flex items-center justify-around z-40">
         <button
           onClick={() => setActiveTab('home')}
@@ -676,7 +669,6 @@ useEffect(() => {
           <span className="text-[10px]">趨勢</span>
         </button>
 
-        {/* 中間大圓新增按鈕 */}
         <button
           onClick={() => setActiveTab('add')}
           className={`w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition ${theme.primary}`}
@@ -705,7 +697,7 @@ useEffect(() => {
         </button>
       </nav>
 
-      {/* 彈出式主題選擇大視窗 */}
+      {/* 主題選擇彈窗 */}
       {showThemeModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto border border-stone-100">
@@ -749,13 +741,6 @@ useEffect(() => {
                       )}
                     </div>
                     <p className="text-[10px] text-stone-400 mt-0.5 leading-snug">{t.desc}</p>
-                    <div className="text-[11px] text-stone-500 mt-1 flex gap-1">
-                      <span>{t.navIcons.home}</span>
-                      <span>{t.navIcons.trends}</span>
-                      <span>{t.navIcons.add}</span>
-                      <span>{t.navIcons.coach}</span>
-                      <span>{t.navIcons.settings}</span>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -770,7 +755,7 @@ useEffect(() => {
 }
 
 /* =========================================================================
-   新增餐點
+   新增餐點視圖
    ========================================================================= */
 function AddMealView({ theme, onMealLogged }) {
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -782,7 +767,7 @@ function AddMealView({ theme, onMealLogged }) {
   const [loading, setLoading] = useState(false);
 
   const handleCapture = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
@@ -838,7 +823,7 @@ function AddMealView({ theme, onMealLogged }) {
         if (photoBase64) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
-       // 輪流嘗試：優先使用 gemini-2.5-flash，若有問題自動無縫切換到 gemini-3.8-flash
+
         const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
         let lastError = null;
 
@@ -872,23 +857,22 @@ function AddMealView({ theme, onMealLogged }) {
             const resp = await model.generateContent(parts);
             const data = JSON.parse(resp.response.text());
             result = { ...data, photoUrl: photoPreview };
-            break; // 成功解析就直接跳出迴圈
+            break;
           } catch (err) {
             console.warn(`模型 ${modelName} 呼叫失敗，嘗試備用模型...`, err);
             lastError = err;
-            // 如果撞到 429 限制，稍微暫停 1 秒再切換
             if (err.message?.includes('429')) {
               await new Promise((resolve) => setTimeout(resolve, 1000));
             }
           }
         }
-        
-      if (!result) {
-        throw lastError || new Error('AI 分析失敗，請稍候重試！');
-       }
+
+        if (!result) {
+          throw lastError || new Error('AI 分析失敗，請稍候重試！');
+        }
       }
       if (result) onMealLogged(result);
-   } catch (err) {
+    } catch (err) {
       console.error(err);
       alert('計算失敗：' + (err.message || '請確認 API Key！'));
     } finally {
@@ -896,54 +880,52 @@ function AddMealView({ theme, onMealLogged }) {
     }
   };
 
-return (
-  <div className="flex flex-col gap-4">
-    <h2 className="text-lg font-black text-stone-800">拍照與新增餐點</h2>
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="text-lg font-black text-stone-800">拍照與新增餐點</h2>
 
-    <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col items-center gap-3">
-      {photoPreview ? (
-        <div className="relative w-40 h-40 rounded-3xl overflow-hidden border-2 border-amber-400 shadow-md">
-          <img src={photoPreview} alt="食物截圖" className="w-full h-full object-cover" />
-          <div className="absolute bottom-2 right-2 flex gap-1">
-            <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
-              📷 重拍
-              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col items-center gap-3">
+        {photoPreview ? (
+          <div className="relative w-40 h-40 rounded-3xl overflow-hidden border-2 border-amber-400 shadow-md">
+            <img src={photoPreview} alt="食物截圖" className="w-full h-full object-cover" />
+            <div className="absolute bottom-2 right-2 flex gap-1">
+              <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
+                📷 重拍
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+              </label>
+              <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
+                🖼️ 重選
+                <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full flex gap-3">
+            <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+              <span className="text-3xl">📷</span>
+              <span className="text-xs font-bold text-amber-800">直接拍照</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/heic,image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleCapture}
+              />
             </label>
-            <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
-              🖼️ 重選
-              <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
+
+            <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+              <span className="text-3xl">🖼️</span>
+              <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCapture}
+              />
             </label>
           </div>
-        </div>
-      ) : (
-        <div className="w-full flex gap-3">
-          {/* 按鈕 1：直接啟動手機相機 */}
-          <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
-            <span className="text-3xl">📷</span>
-            <span className="text-xs font-bold text-amber-800">直接拍照</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleCapture}
-            />
-          </label>
-
-          {/* 按鈕 2：直接打開手機相簿 */}
-          <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
-            <span className="text-3xl">🖼️</span>
-            <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleCapture}
-            />
-          </label>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
       <input
         type="text"
@@ -1053,11 +1035,10 @@ return (
 }
 
 /* =========================================================================
-   超可愛貓貓營養師教練 (MewCal 🐾)
+   貓貓營養師教練 (MewCal 🐾)
    ========================================================================= */
 function AICoachView({ theme, statusContext }) {
   const [catMood, setCatMood] = useState('happy');
-
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -1230,26 +1211,23 @@ function AICoachView({ theme, statusContext }) {
 }
 
 /* =========================================================================
-   子頁面組件：趨勢視圖 (完整日/週/月/年切換、真實資料留空、安全防崩潰)
+   趨勢視圖
    ========================================================================= */
-function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUpdateWeight, theme = {} }) {
-  const [timeSpan, setTimeSpan] = useState('week'); // 'day' | 'week' | 'month' | 'year'
+function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUpdateWeight, theme = {} }) {
+  const [timeSpan, setTimeSpan] = useState('week');
   const [showWeightInput, setShowWeightInput] = useState(false);
 
- // 1. 基本數值讀取
   const currentWeight = Number(userProfile?.weight) || 55;
   const userHeight = Number(userProfile?.height) || 160;
   const waterGoal = Number(userProfile?.waterGoal) || 2000;
   const primaryTheme = theme?.primary || 'bg-amber-500 text-white';
 
-  // 2. 將 targetWeight 宣告為本地 State（先讀 props，沒有就讀 localStorage，預設 50）
   const [targetWeight, setTargetWeight] = useState(() => {
     return Number(userProfile?.targetWeight) || Number(localStorage.getItem('target_weight')) || 50;
   });
 
-  // 3. 輸入框的暫存狀態
   const [inputWeightVal, setInputWeightVal] = useState(currentWeight.toString());
-  const [inputTargetWeightVal, setInputTargetWeightVal] = useState(targetWeight.toString()); 
+  const [inputTargetWeightVal, setInputTargetWeightVal] = useState(targetWeight.toString());
 
   const currentBMI = (currentWeight / Math.pow(userHeight / 100, 2)).toFixed(1);
 
@@ -1261,138 +1239,80 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
     storedDaily = {};
   }
 
-  // 1. 日視角：近 3 天
   const getDayConfig = () => {
     const list = [];
     for (let i = 2; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = getLocalDateString(d);
       const lbl = i === 0 ? '今天' : i === 1 ? '昨天' : '前天';
       list.push({ date: iso, label: lbl });
     }
     return {
       labels: list.map((item) => item.label),
-      weights: list.map((item, idx) => {
-        if (idx === list.length - 1 && currentWeight) return currentWeight;
-        const rec = storedDaily[item.date];
-        return rec?.weight ? Number(rec.weight) : null;
+      weights: list.map((item) => {
+        return weightHistory[item.date] || storedDaily[item.date]?.weight || (item.label === '今天' ? currentWeight : null);
       }),
       waters: list.map((item) => {
-        const rec = storedDaily[item.date];
-        return rec?.water !== undefined ? Number(rec.water) : null;
+        const val = localStorage.getItem(`water_${item.date}`);
+        return val !== null ? Number(val) : (storedDaily[item.date]?.water ?? null);
       }),
       steps: list.map((item) => {
-        const rec = storedDaily[item.date];
-        return rec?.steps !== undefined ? Number(rec.steps) : null;
+        const val = localStorage.getItem(`steps_${item.date}`);
+        return val !== null ? Number(val) : (storedDaily[item.date]?.steps ?? null);
       }),
       desc: '近 3 天變化',
     };
   };
 
-  // 2. 週視角：近 7 天
   const getWeekConfig = () => {
     const list = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = getLocalDateString(d);
       const weekday = d.toLocaleDateString('zh-TW', { weekday: 'narrow' });
       list.push({ date: iso, label: i === 0 ? '今天' : `週${weekday}` });
     }
     return {
       labels: list.map((item) => item.label),
-      weights: list.map((item, idx) => {
-        if (idx === list.length - 1 && currentWeight) return currentWeight;
-        const rec = storedDaily[item.date];
-        return rec?.weight ? Number(rec.weight) : null;
+      weights: list.map((item) => {
+        return weightHistory[item.date] || storedDaily[item.date]?.weight || (item.label === '今天' ? currentWeight : null);
       }),
       waters: list.map((item) => {
-        const rec = storedDaily[item.date];
-        return rec?.water !== undefined ? Number(rec.water) : null;
+        const val = localStorage.getItem(`water_${item.date}`);
+        return val !== null ? Number(val) : (storedDaily[item.date]?.water ?? null);
       }),
       steps: list.map((item) => {
-        const rec = storedDaily[item.date];
-        return rec?.steps !== undefined ? Number(rec.steps) : null;
+        const val = localStorage.getItem(`steps_${item.date}`);
+        return val !== null ? Number(val) : (storedDaily[item.date]?.steps ?? null);
       }),
       desc: '近 7 天走勢',
     };
   };
 
-  // 3. 月視角：近 4 週
   const getMonthConfig = () => {
     const labels = ['3週前', '2週前', '上週', '本週'];
-    const now = new Date();
-    const weeksData = [0, 1, 2, 3].map((weekOffset) => {
-      const dates = [];
-      for (let day = 0; day < 7; day++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - (weekOffset * 7 + day));
-        dates.push(d.toISOString().split('T')[0]);
-      }
-      return dates;
-    }).reverse();
-
-    const calcAvg = (field) => {
-      return weeksData.map((weekDates, idx) => {
-        const vals = weekDates.map((dateStr) => {
-          if (idx === 3 && dateStr === now.toISOString().split('T')[0] && field === 'weight') {
-            return currentWeight;
-          }
-          const rec = storedDaily[dateStr];
-          return rec?.[field] !== undefined ? Number(rec[field]) : null;
-        }).filter((v) => v !== null && !isNaN(v));
-
-        if (vals.length === 0) return null;
-        const sum = vals.reduce((a, b) => a + b, 0);
-        return field === 'weight' ? Number((sum / vals.length).toFixed(1)) : Math.round(sum / vals.length);
-      });
-    };
-
     return {
       labels,
-      weights: calcAvg('weight'),
-      waters: calcAvg('water'),
-      steps: calcAvg('steps'),
+      weights: [null, null, null, currentWeight],
+      waters: [null, null, null, Number(localStorage.getItem(`water_${getLocalDateString()}`)) || null],
+      steps: [null, null, null, Number(localStorage.getItem(`steps_${getLocalDateString()}`)) || null],
       desc: '近 4 週平均走勢',
     };
   };
 
-  // 4. 年視角：近 6 個雙月 (1, 3, 5, 7, 9, 11月)
   const getYearConfig = () => {
     const labels = ['1月', '3月', '5月', '7月', '9月', '11月'];
-    const currentYear = new Date().getFullYear();
-    const months = [1, 3, 5, 7, 9, 11];
-
-    const calcMonthAvg = (field) => {
-      return months.map((m) => {
-        const targetPrefix = `${currentYear}-${String(m).padStart(2, '0')}`;
-        const vals = Object.keys(storedDaily)
-          .filter((k) => k.startsWith(targetPrefix))
-          .map((k) => storedDaily[k]?.[field])
-          .filter((v) => v !== undefined && v !== null && !isNaN(v))
-          .map(Number);
-
-        if (m === new Date().getMonth() + 1 && field === 'weight') {
-          vals.push(currentWeight);
-        }
-
-        if (vals.length === 0) return null;
-        const sum = vals.reduce((a, b) => a + b, 0);
-        return field === 'weight' ? Number((sum / vals.length).toFixed(1)) : Math.round(sum / vals.length);
-      });
-    };
-
     return {
       labels,
-      weights: calcMonthAvg('weight'),
-      waters: calcMonthAvg('water'),
-      steps: calcMonthAvg('steps'),
+      weights: [null, null, null, null, currentWeight, null],
+      waters: [null, null, null, null, Number(localStorage.getItem(`water_${getLocalDateString()}`)) || null, null],
+      steps: [null, null, null, null, Number(localStorage.getItem(`steps_${getLocalDateString()}`)) || null, null],
       desc: '整年度走勢',
     };
   };
 
-  // 根據 timeSpan 選擇當前資料結構
   const currentConfig = {
     day: getDayConfig(),
     week: getWeekConfig(),
@@ -1407,10 +1327,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
     if (!isNaN(w) && onUpdateWeight) onUpdateWeight(w);
 
     if (!isNaN(tw)) {
-      // 關鍵：這行會強制 React 立即把畫面上的數字換掉！
       setTargetWeight(tw);
-
-      // 儲存到 localStorage，重整後依然存在
       localStorage.setItem('target_weight', tw.toString());
 
       let existingProfile = {};
@@ -1428,7 +1345,6 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
       };
 
       localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
-
       if (typeof setUserProfile === 'function') {
         setUserProfile(updatedProfile);
       }
@@ -1436,8 +1352,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
 
     setShowWeightInput(false);
   };
-  
-  // 體重安全縮放計算
+
   const validWeights = currentConfig.weights.filter((v) => v !== null && !isNaN(v));
   const minW = validWeights.length > 0 ? Math.min(...validWeights) - 0.5 : 40;
   const maxW = validWeights.length > 0 ? Math.max(...validWeights) + 0.5 : 80;
@@ -1445,7 +1360,6 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 週期切換：日 / 週 / 月 / 年 4 個維度 */}
       <div className="grid grid-cols-4 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
         {[
           { key: 'day', label: '日' },
@@ -1466,7 +1380,6 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         ))}
       </div>
 
-      {/* 體重與 BMI 概覽卡片 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-2 text-center items-center">
           <div>
@@ -1496,7 +1409,6 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         </button>
       </div>
 
-      {/* 體重輸入彈窗 */}
       {showWeightInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl flex flex-col gap-3 border border-stone-100">
@@ -1541,7 +1453,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         </div>
       )}
 
-      {/* 1. 體重變化卡片 */}
+      {/* 體重變化 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
         <div className="flex justify-between items-baseline">
           <div>
@@ -1570,7 +1482,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
                   <div className="w-1.5 h-1.5 rounded-full bg-stone-200 my-auto" />
                 )}
                 <span className="text-[9px] text-stone-400 font-mono font-bold">
-                  {hasVal ? val.toFixed(1) : '--'}
+                  {hasVal ? Number(val).toFixed(1) : '--'}
                 </span>
               </div>
             );
@@ -1583,7 +1495,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         </div>
       </div>
 
-      {/* 2. 飲水走勢卡片 */}
+      {/* 飲水走勢 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
         <div className="flex justify-between items-baseline">
           <div>
@@ -1623,7 +1535,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
         </div>
       </div>
 
-      {/* 3. 步數走勢卡片 */}
+      {/* 步數走勢 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-2">
         <div className="flex justify-between items-baseline">
           <div>
@@ -1665,207 +1577,226 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = [], onUp
     </div>
   );
 }
+
 /* =========================================================================
-   子頁面組件：設定視圖 (新增「加入主畫面」指引與按鈕)
+   設定視圖 (內建清空今日快取按鈕)
    ========================================================================= */
-   function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile }) {
-    const [profile, setProfile] = useState(userProfile);
-    const [savedSuccess, setSavedSuccess] = useState(false);
-    const [showPwaModal, setShowPwaModal] = useState(false);
-  
-    const handleSave = () => {
-      setUserProfile(profile);
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 2000);
-    };
-  
-    return (
-      <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-black text-stone-800">個人化設定</h2>
-  
-        {/* 📲 新增：將本網頁加入主畫面按鍵 */}
-        <div
-          onClick={() => setShowPwaModal(true)}
-          className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-3xl border border-amber-200 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-2xl shadow-xs border border-amber-100">
-              📱
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-black text-stone-800">加到手機主畫面</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500 text-white">
-                  推薦
-                </span>
-              </div>
-              <p className="text-[11px] text-stone-500 mt-0.5">免下載安裝，一鍵變身全螢幕 App！</p>
-            </div>
+function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, selectedDate }) {
+  const [profile, setProfile] = useState(userProfile);
+  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [showPwaModal, setShowPwaModal] = useState(false);
+
+  const handleSave = () => {
+    setUserProfile(profile);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2000);
+  };
+
+  const handleResetCurrentDay = () => {
+    if (window.confirm(`確定要徹底清空 ${selectedDate} 當天的飲食、沙盒、步數與運動紀錄嗎？`)) {
+      localStorage.removeItem(`meals_${selectedDate}`);
+      localStorage.removeItem(`water_${selectedDate}`);
+      localStorage.removeItem(`steps_${selectedDate}`);
+      localStorage.removeItem(`exercise_${selectedDate}`);
+      localStorage.removeItem(`exercise_min_${selectedDate}`);
+      alert(`${selectedDate} 紀錄已重設歸零！`);
+      window.location.reload();
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="text-lg font-black text-stone-800">個人化設定</h2>
+
+      <div
+        onClick={() => setShowPwaModal(true)}
+        className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-3xl border border-amber-200 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-2xl shadow-xs border border-amber-100">
+            📱
           </div>
-          <span className="text-sm font-bold text-amber-600">❯</span>
-        </div>
-  
-        {/* 加入主畫面教學彈窗 */}
-        {showPwaModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white w-full max-w-xs rounded-3xl p-5 shadow-2xl flex flex-col gap-4 border border-stone-100 text-center">
-              <span className="text-4xl">📲</span>
-              <div>
-                <h3 className="font-black text-base text-stone-800">如何加到主畫面？</h3>
-                <p className="text-xs text-stone-400 mt-1">享受像原生 App 一樣的全螢幕體驗</p>
-              </div>
-  
-              <div className="text-left bg-stone-50 p-3.5 rounded-2xl flex flex-col gap-2.5 text-xs text-stone-700">
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-amber-600">iOS:</span>
-                  <span>點擊 Safari 底部「分享按鈕（長方形向上箭頭）」➔ 往下找到並點擊<strong>「加入主畫面」</strong>。</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="font-bold text-amber-600">Android:</span>
-                  <span>點擊 Chrome 右上角「三個點選單」➔ 點擊<strong>「加到主螢幕」</strong>或「安裝應用程式」。</span>
-                </div>
-              </div>
-  
-              <button
-                onClick={() => setShowPwaModal(false)}
-                className={`w-full py-2.5 text-xs font-bold rounded-xl ${theme.primary}`}
-              >
-                我知道了
-              </button>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-black text-stone-800">加到手機主畫面</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500 text-white">
+                推薦
+              </span>
             </div>
-          </div>
-        )}
-  
-        {/* 彈出式主題選擇入口卡片 */}
-        <div
-          onClick={onOpenThemeModal}
-          className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition hover:shadow-md"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-stone-50 border border-stone-100 flex items-center justify-center text-2xl shadow-xs">
-              {theme.emoji}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-black text-stone-800">{theme.name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800">
-                  目前主題
-                </span>
-              </div>
-              <p className="text-[11px] text-stone-400 mt-0.5">點擊瀏覽並切換 8 款風格主題庫 ✨</p>
-            </div>
-          </div>
-          <span className="text-sm font-bold text-stone-300">❯</span>
-        </div>
-  
-        {/* 休息日目標 */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
-          <span className="text-xs font-bold text-stone-700">☕ 休息日 (Rest Day) 目標設定</span>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-stone-400">總熱量 (kcal)</label>
-              <input
-                type="number"
-                value={profile.restDay.calories}
-                onChange={(e) =>
-                  setProfile({ ...profile, restDay: { ...profile.restDay, calories: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">碳水化合物 (g)</label>
-              <input
-                type="number"
-                value={profile.restDay.carbs}
-                onChange={(e) =>
-                  setProfile({ ...profile, restDay: { ...profile.restDay, carbs: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">蛋白質 (g)</label>
-              <input
-                type="number"
-                value={profile.restDay.protein}
-                onChange={(e) =>
-                  setProfile({ ...profile, restDay: { ...profile.restDay, protein: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">油脂 / 脂肪 (g)</label>
-              <input
-                type="number"
-                value={profile.restDay.fat}
-                onChange={(e) =>
-                  setProfile({ ...profile, restDay: { ...profile.restDay, fat: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
+            <p className="text-[11px] text-stone-500 mt-0.5">免下載安裝，一鍵變身全螢幕 App！</p>
           </div>
         </div>
-  
-        {/* 運動日目標 */}
-        <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
-          <span className="text-xs font-bold text-orange-600">⚡ 運動日 (Workout Day) 目標設定</span>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-stone-400">總熱量 (kcal)</label>
-              <input
-                type="number"
-                value={profile.workoutDay.calories}
-                onChange={(e) =>
-                  setProfile({ ...profile, workoutDay: { ...profile.workoutDay, calories: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">碳水化合物 (g)</label>
-              <input
-                type="number"
-                value={profile.workoutDay.carbs}
-                onChange={(e) =>
-                  setProfile({ ...profile, workoutDay: { ...profile.workoutDay, carbs: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">蛋白質 (g)</label>
-              <input
-                type="number"
-                value={profile.workoutDay.protein}
-                onChange={(e) =>
-                  setProfile({ ...profile, workoutDay: { ...profile.workoutDay, protein: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400">油脂 / 脂肪 (g)</label>
-              <input
-                type="number"
-                value={profile.workoutDay.fat}
-                onChange={(e) =>
-                  setProfile({ ...profile, workoutDay: { ...profile.workoutDay, fat: Number(e.target.value) } })
-                }
-                className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
-              />
-            </div>
-          </div>
-        </div>
-  
-        <button
-          onClick={handleSave}
-          className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition ${theme.primary}`}
-        >
-          {savedSuccess ? '儲存成功！已同步至首頁 ✓' : '儲存所有設定'}
-        </button>
+        <span className="text-sm font-bold text-amber-600">❯</span>
       </div>
-    );
-  }
+
+      {showPwaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-xs rounded-3xl p-5 shadow-2xl flex flex-col gap-4 border border-stone-100 text-center">
+            <span className="text-4xl">📲</span>
+            <div>
+              <h3 className="font-black text-base text-stone-800">如何加到主畫面？</h3>
+              <p className="text-xs text-stone-400 mt-1">享受像原生 App 一樣的全螢幕體驗</p>
+            </div>
+
+            <div className="text-left bg-stone-50 p-3.5 rounded-2xl flex flex-col gap-2.5 text-xs text-stone-700">
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-amber-600">iOS:</span>
+                <span>點擊 Safari 底部「分享按鈕（長方形向上箭頭）」➔ 往下找到並點擊<strong>「加入主畫面」</strong>。</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-amber-600">Android:</span>
+                <span>點擊 Chrome 右上角「三個點選單」➔ 點擊<strong>「加到主螢幕」</strong>或「安裝應用程式」。</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowPwaModal(false)}
+              className={`w-full py-2.5 text-xs font-bold rounded-xl ${theme.primary}`}
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        onClick={onOpenThemeModal}
+        className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition hover:shadow-md"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-stone-50 border border-stone-100 flex items-center justify-center text-2xl shadow-xs">
+            {theme.emoji}
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-black text-stone-800">{theme.name}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800">
+                目前主題
+              </span>
+            </div>
+            <p className="text-[11px] text-stone-400 mt-0.5">點擊瀏覽並切換 8 款風格主題庫 ✨</p>
+          </div>
+        </div>
+        <span className="text-sm font-bold text-stone-300">❯</span>
+      </div>
+
+      {/* 休息日目標 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
+        <span className="text-xs font-bold text-stone-700">☕ 休息日 (Rest Day) 目標設定</span>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="text-[10px] text-stone-400">總熱量 (kcal)</label>
+            <input
+              type="number"
+              value={profile.restDay.calories}
+              onChange={(e) =>
+                setProfile({ ...profile, restDay: { ...profile.restDay, calories: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">碳水化合物 (g)</label>
+            <input
+              type="number"
+              value={profile.restDay.carbs}
+              onChange={(e) =>
+                setProfile({ ...profile, restDay: { ...profile.restDay, carbs: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">蛋白質 (g)</label>
+            <input
+              type="number"
+              value={profile.restDay.protein}
+              onChange={(e) =>
+                setProfile({ ...profile, restDay: { ...profile.restDay, protein: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">油脂 / 脂肪 (g)</label>
+            <input
+              type="number"
+              value={profile.restDay.fat}
+              onChange={(e) =>
+                setProfile({ ...profile, restDay: { ...profile.restDay, fat: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 運動日目標 */}
+      <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
+        <span className="text-xs font-bold text-orange-600">⚡ 運動日 (Workout Day) 目標設定</span>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="text-[10px] text-stone-400">總熱量 (kcal)</label>
+            <input
+              type="number"
+              value={profile.workoutDay.calories}
+              onChange={(e) =>
+                setProfile({ ...profile, workoutDay: { ...profile.workoutDay, calories: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">碳水化合物 (g)</label>
+            <input
+              type="number"
+              value={profile.workoutDay.carbs}
+              onChange={(e) =>
+                setProfile({ ...profile, workoutDay: { ...profile.workoutDay, carbs: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">蛋白質 (g)</label>
+            <input
+              type="number"
+              value={profile.workoutDay.protein}
+              onChange={(e) =>
+                setProfile({ ...profile, workoutDay: { ...profile.workoutDay, protein: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400">油脂 / 脂肪 (g)</label>
+            <input
+              type="number"
+              value={profile.workoutDay.fat}
+              onChange={(e) =>
+                setProfile({ ...profile, workoutDay: { ...profile.workoutDay, fat: Number(e.target.value) } })
+              }
+              className="w-full border border-stone-200 rounded-xl p-2 mt-0.5 outline-none font-bold"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 🗑️ 重設當天紀錄按鈕 */}
+      <button
+        type="button"
+        onClick={handleResetCurrentDay}
+        className="w-full py-3 rounded-2xl font-bold text-xs bg-red-50 text-red-600 border border-red-200 active:scale-95 transition cursor-pointer"
+      >
+        🗑️ 清空 {selectedDate} 紀錄（重設為 0）
+      </button>
+
+      <button
+        onClick={handleSave}
+        className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition ${theme.primary}`}
+      >
+        {savedSuccess ? '儲存成功！已同步至首頁 ✓' : '儲存所有設定'}
+      </button>
+    </div>
+  );
+}
