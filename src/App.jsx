@@ -819,7 +819,7 @@ function AddMealView({ theme, onMealLogged }) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
 
-        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+        const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
         let lastError = null;
 
         for (const modelName of candidateModels) {
@@ -1081,7 +1081,7 @@ function AICoachView({ theme, statusContext }) {
 
 請用活潑可愛、排版清晰的口氣回答，適當使用列點與可愛 Emoji，讓使用者看了食慾與心情都超好喵！`;
 
-      const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+      const candidateModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
       let replyText = null;
       let lastError = null;
 
