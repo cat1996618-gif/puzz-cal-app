@@ -819,7 +819,7 @@ function AddMealView({ theme, onMealLogged }) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
 
-        const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8flash'];
         let lastError = null;
 
         for (const modelName of candidateModels) {
@@ -896,9 +896,23 @@ function AddMealView({ theme, onMealLogged }) {
           </div>
         ) : (
           <div className="w-full flex gap-3">
+            {/* 按鈕 1：強制啟動相機拍照 */}
             <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
               <span className="text-3xl">📷</span>
-              <span className="text-xs font-bold text-amber-800">拍照或選圖</span>
+              <span className="text-xs font-bold text-amber-800">直接拍照</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleCapture}
+              />
+            </label>
+
+            {/* 按鈕 2：直接挑選相簿 */}
+            <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+              <span className="text-3xl">🖼️</span>
+              <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
               <input
                 type="file"
                 accept="image/*"
@@ -1067,7 +1081,7 @@ function AICoachView({ theme, statusContext }) {
 
 請用活潑可愛、排版清晰的口氣回答，適當使用列點與可愛 Emoji，讓使用者看了食慾與心情都超好喵！`;
 
-      const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+      const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
       let replyText = null;
       let lastError = null;
 
