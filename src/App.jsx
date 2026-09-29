@@ -819,7 +819,7 @@ function AddMealView({ theme, onMealLogged }) {
           parts.push({ inlineData: { data: photoBase64, mimeType: 'image/jpeg' } });
         }
 
-        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8flash'];
+        const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
         let lastError = null;
 
         for (const modelName of candidateModels) {
