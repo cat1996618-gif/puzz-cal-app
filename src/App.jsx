@@ -1039,7 +1039,7 @@ function AICoachView({ theme, statusContext }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: `喵嗚～！我是你的專屬貓貓營養管家「喵卡」🐾✨\n\n今天不管是想躺平還是動起來，我都陪著你喔！\n目前看小筆記本：\n▸ 剩餘熱量：${statusContext.remainCalories} kcal 🍯\n▸ 蛋白質還差：${statusContext.remainProtein} g 🐟\n\n肚子餓了嗎？想要外食超商攻略、還是想自己煮好吃的呢？隨時喵我！(=^･ω･^=)`,
+      text: `喵嗚～！我是你的專屬貓貓營養管家「喵卡」🐾✨\n\n今天不管是想躺平還是動起來，我都陪著你喔！\n目前看小筆記本：\n▸ 剩餘熱量：${Number(statusContext.remainCalories.toFixed(1))} kcal 🍯\n▸ 蛋白質還差：${Number(statusContext.remainProtein.toFixed(1))} g 🐟\n\n肚子餓了嗎？想要外食超商攻略、還是想自己煮好吃的呢？隨時喵我！(=^･ω･^=)`,
     },
   ]);
   const [inputMsg, setInputMsg] = useState('');
@@ -1071,10 +1071,10 @@ function AICoachView({ theme, statusContext }) {
 
 使用者今日即時狀態：
 - 今日型態：${statusContext.dayType === 'workout' ? '⚡ 運動日（可以吃多一點點碳水喵！）' : '☕ 休息日（清淡舒服為主喵～）'}
-- 剩餘熱量額度：${statusContext.remainCalories} kcal
-- 剩餘碳水：${statusContext.remainCarbs} g
-- 剩餘蛋白質：${statusContext.remainProtein} g
-- 剩餘油脂：${statusContext.remainFat} g
+- 剩餘熱量額度：${Number(statusContext.remainCalories.toFixed(1))} kcal
+- 剩餘碳水：${Number(statusContext.remainCarbs.toFixed(1)) g
+- 剩餘蛋白質：${Number(statusContext.remainProtein.toFixed(1))} g
+- 剩餘油脂：${Number(statusContext.remainFat.toFixed(1))} g
 - 今日運動消耗：${statusContext.totalBurn} kcal
 
 使用者說：${userText}
@@ -1139,7 +1139,7 @@ function AICoachView({ theme, statusContext }) {
 
         <div className="text-right bg-white/80 px-2.5 py-1 rounded-xl border border-amber-100">
           <span className="text-[9px] text-stone-400 block -mb-0.5">剩餘額度</span>
-          <span className="text-xs font-black text-amber-600">{statusContext.remainCalories} kcal</span>
+          <span className="text-xs font-black text-amber-600">{Number(statusContext.remainCalories.toFixed(1))} kcal</span>
         </div>
       </div>
 
