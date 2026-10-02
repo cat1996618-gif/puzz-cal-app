@@ -363,7 +363,7 @@ export default function App() {
               <div>
                 <span className="text-[11px] font-bold text-stone-400 block">剩餘熱量</span>
                 <div className="text-3xl font-black tracking-tight text-stone-800">
-                  {remainCalories > 0 ? remainCalories : 0}
+                  {remainCalories > 0 ? Number(remainCalories.toFixed(1)) : 0}
                   <span className="text-xs font-medium text-stone-400 ml-1">kcal</span>
                 </div>
                 <div className="text-[11px] text-stone-400 mt-0.5">每日總目標: {currentTarget.calories} kcal</div>
