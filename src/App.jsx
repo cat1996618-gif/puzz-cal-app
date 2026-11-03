@@ -773,7 +773,18 @@ export default function App() {
         </div>
       )}
 
-      <MealDetailModal meal={selectedMealDetail} onClose={() => setSelectedMealDetail(null)} />
+      <MealDetailModal
+       meal={selectedMealDetail}
+       onClose={() => setSelectedMealDetail(null)}
+       onDelete={(targetMeal) => {
+         setMeals((prev) => prev.filter((m) => m !== targetMeal && m.id !== targetMeal.id));
+       }}
+       onUpdate={(updatedMeal) => {
+         setMeals((prev) =>
+           prev.map((m) => (m === selectedMealDetail || (m.id && m.id === selectedMealDetail.id) ? updatedMeal : m))
+          );
+        }}
+      />
       {/* 編輯 / 刪除餐點彈窗 */}
       {editingMeal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
