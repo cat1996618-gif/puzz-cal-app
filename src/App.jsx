@@ -141,7 +141,6 @@ const EXERCISE_TYPES = [
   { id: 'swim', name: '游泳訓練', emoji: '🏊', calPerMin: 8.5 },
 ];
 
-// 本地年月日格式化 YYYY-MM-DD
 const getLocalDateString = (d = new Date()) => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -183,7 +182,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // 獨立載入特定日期資料的 Helper 函式
+  // 讀取特定日期資料
   const readDailyData = (date) => {
     try {
       const savedMeals = localStorage.getItem(`meals_${date}`);
@@ -212,42 +211,17 @@ export default function App() {
   const [exerciseMinutes, setExerciseMinutes] = useState(initialTodayData.minutes);
   const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
-  // 記錄目前正在編輯哪一筆餐點（儲存 index 與完整餐點物件）
-  const [editingMeal, setEditingMeal] = useState(null);
-
-  // 刪除餐點處理函式
-  const handleDeleteMeal = (index) => {
-    if (window.confirm('確定要刪除這筆餐點紀錄嗎？沙盒裡的這道菜也會一起移除喔！')) {
-      const updated = meals.filter((_, i) => i !== index);
-      setMeals(updated);
-      setEditingMeal(null);
-    }
-  };
-
-  // 儲存修改後的餐點處理函式
-  const handleSaveMeal = (index, updatedItem) => {
-    const updated = [...meals];
-    // 確保數值轉換為乾淨純數字，避免格式化報錯
-    updated[index] = {
-      ...updatedItem,
-      total_calories: Math.round(Number(updatedItem.total_calories) || 0),
-      macros: {
-        carbs: Number(Number(updatedItem.macros?.carbs || 0).toFixed(1)),
-        protein: Number(Number(updatedItem.macros?.protein || 0).toFixed(1)),
-        fat: Number(Number(updatedItem.macros?.fat || 0).toFixed(1)),
-      },
-    };
-    setMeals(updated);
-    setEditingMeal(null);
-  };
-
-  // 切換日期的處理函式
+  // 切換日期
   const handleDateChange = (newDate) => {
-    localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
-    localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
-    localStorage.setItem(`steps_${selectedDate}`, steps.toString());
-    localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
-    localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
+    try {
+      localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+      localStorage.setItem(`water_${selectedDate}`, waterIntake.toString());
+      localStorage.setItem(`steps_${selectedDate}`, steps.toString());
+      localStorage.setItem(`exercise_${selectedDate}`, selectedExercise);
+      localStorage.setItem(`exercise_min_${selectedDate}`, exerciseMinutes.toString());
+    } catch (e) {
+      console.warn('儲存資料時發生異常', e);
+    }
 
     const data = readDailyData(newDate);
     setMeals(data.meals);
@@ -255,12 +229,15 @@ export default function App() {
     setSteps(data.steps);
     setSelectedExercise(data.exercise);
     setExerciseMinutes(data.minutes);
-
     setSelectedDate(newDate);
   };
 
   useEffect(() => {
-    localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+    try {
+      localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
+    } catch (e) {
+      console.warn('儲存餐點失敗', e);
+    }
   }, [meals, selectedDate]);
 
   useEffect(() => {
@@ -291,16 +268,21 @@ export default function App() {
     localStorage.setItem('app_theme', themeKey);
   }, [themeKey]);
 
-  // 熱量計算
-  const consumedCalories = meals.reduce((s, m) => s + (m.total_calories || 0), 0);
-  const consumedCarbs = meals.reduce((s, m) => s + (m.macros?.carbs || 0), 0);
-  const consumedProtein = meals.reduce((s, m) => s + (m.macros?.protein || 0), 0);
-  const consumedFat = meals.reduce((s, m) => s + (m.macros?.fat || 0), 0);
+  // 數值安全轉換與計算
+  const parseNum = (v) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  };
 
-  const remainCalories = currentTarget.calories - consumedCalories;
-  const remainCarbs = currentTarget.carbs - consumedCarbs;
-  const remainProtein = currentTarget.protein - consumedProtein;
-  const remainFat = currentTarget.fat - consumedFat;
+  const consumedCalories = meals.reduce((s, m) => s + parseNum(m.total_calories), 0);
+  const consumedCarbs = meals.reduce((s, m) => s + parseNum(m.macros?.carbs), 0);
+  const consumedProtein = meals.reduce((s, m) => s + parseNum(m.macros?.protein), 0);
+  const consumedFat = meals.reduce((s, m) => s + parseNum(m.macros?.fat), 0);
+
+  const remainCalories = Math.max(0, Math.round((currentTarget.calories - consumedCalories) * 10) / 10);
+  const remainCarbs = Math.max(0, Math.round((currentTarget.carbs - consumedCarbs) * 10) / 10);
+  const remainProtein = Math.max(0, Math.round((currentTarget.protein - consumedProtein) * 10) / 10);
+  const remainFat = Math.max(0, Math.round((currentTarget.fat - consumedFat) * 10) / 10);
 
   const stepBurn = Math.round(steps * 0.04);
   const exConfig = EXERCISE_TYPES.find((e) => e.id === selectedExercise) || EXERCISE_TYPES[0];
@@ -330,7 +312,7 @@ export default function App() {
             <div className="flex items-center justify-between pt-1">
               <button
                 onClick={() => setShowDatePicker(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white shadow-sm border border-stone-200/80 active:scale-95 transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white shadow-sm border border-stone-200/80 active:scale-95 transition cursor-pointer"
               >
                 <span className="text-base">{theme.navIcons.home}</span>
                 <span className="text-xs font-black tracking-wide text-stone-700">{formattedDateString}</span>
@@ -370,13 +352,13 @@ export default function App() {
                         handleDateChange(getLocalDateString());
                         setShowDatePicker(false);
                       }}
-                      className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-stone-100 text-stone-600"
+                      className="flex-1 py-2.5 text-xs font-bold rounded-xl bg-stone-100 text-stone-600 cursor-pointer"
                     >
                       回到今天
                     </button>
                     <button
                       onClick={() => setShowDatePicker(false)}
-                      className={`flex-1 py-2.5 text-xs font-bold rounded-xl ${theme.primary}`}
+                      className={`flex-1 py-2.5 text-xs font-bold rounded-xl cursor-pointer ${theme.primary}`}
                     >
                       確定
                     </button>
@@ -392,7 +374,7 @@ export default function App() {
               <div>
                 <span className="text-[11px] font-bold text-stone-400 block">剩餘熱量</span>
                 <div className="text-3xl font-black tracking-tight text-stone-800">
-                  {remainCalories > 0 ? Number(remainCalories.toFixed(1)) : 0}
+                  {remainCalories}
                   <span className="text-xs font-medium text-stone-400 ml-1">kcal</span>
                 </div>
                 <div className="text-[11px] text-stone-400 mt-0.5">每日總目標: {currentTarget.calories} kcal</div>
@@ -437,7 +419,7 @@ export default function App() {
                       {m.name}<br />剩餘
                     </span>
                     <div className="text-base font-black text-stone-800 my-0.5 tracking-tight">
-                      {m.remain > 0 ? (Number.isInteger(m.remain) ? m.remain : m.remain.toFixed(1)) : 0}g
+                      {m.remain > 0 ? (m.remain % 1 === 0 ? m.remain : m.remain.toFixed(1)) : 0}g
                     </div>
                     <span className="text-[9px] text-stone-400">目標 {m.total}g</span>
                   </div>
@@ -475,7 +457,7 @@ export default function App() {
                     <button
                       key={addStep}
                       onClick={() => setSteps((prev) => prev + addStep)}
-                      className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-[10px] font-bold active:scale-90 transition"
+                      className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-[10px] font-bold active:scale-90 transition cursor-pointer"
                     >
                       +{addStep / 1000}k步
                     </button>
@@ -510,7 +492,7 @@ export default function App() {
                         setExerciseMinutes(30);
                       }
                     }}
-                    className="text-xs font-bold bg-stone-50 border border-stone-200 rounded-xl p-1 mt-0.5 outline-none"
+                    className="text-xs font-bold bg-stone-50 border border-stone-200 rounded-xl p-1 mt-0.5 outline-none cursor-pointer"
                   >
                     {EXERCISE_TYPES.map((ex) => (
                       <option key={ex.id} value={ex.id}>
@@ -562,7 +544,7 @@ export default function App() {
                   <button
                     key={amt}
                     onClick={() => setWaterIntake((prev) => prev + amt)}
-                    className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-xl text-xs font-black active:scale-90 transition border border-sky-100"
+                    className="px-2.5 py-1.5 bg-sky-50 text-sky-600 rounded-xl text-xs font-black active:scale-90 transition border border-sky-100 cursor-pointer"
                   >
                     +{amt}
                   </button>
@@ -570,49 +552,51 @@ export default function App() {
               </div>
             </div>
 
-            {/* 餐點清單 */}
+            {/* 今日餐點總覽 */}
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center px-1">
-              <h3 className="text-xs font-black text-stone-500 tracking-wider">今日餐點總覽</h3>
-              <span className="text-[10px] text-stone-400">點擊卡片可修改或刪除</span>
-            </div>
+                <h3 className="text-xs font-black text-stone-500 tracking-wider">今日餐點總覽</h3>
+                <span className="text-[10px] text-stone-400">點擊卡片可修改或刪除</span>
+              </div>
               {meals.length === 0 ? (
                 <div className="text-center py-6 bg-white/60 rounded-3xl border border-dashed border-stone-200 text-stone-400 text-xs">
                   今天還沒記錄餐點，按下方中間按鈕新增拍照吧！
                 </div>
               ) : (
                 meals.map((meal, idx) => (
-            <div
-              key={idx}
-              onClick={() => setEditingMeal({ index: idx, data: { ...meal } })}
-              className="bg-white p-3.5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition hover:border-amber-300"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-xl overflow-hidden shrink-0">
-                  {meal.photoUrl ? (
-                    <img src={meal.photoUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    '🍱'
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-stone-800 line-clamp-1">{meal.meal_name}</h4>
-                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-stone-500 font-medium">
-                    <span>🍞 {meal.macros?.carbs ?? 0}g</span>
-                    <span>🥩 {meal.macros?.protein ?? 0}g</span>
-                    <span>🥑 {meal.macros?.fat ?? 0}g</span>
-                  </div>
-                </div>
-              </div>
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedMealDetail(meal)}
+                    className="bg-white p-3.5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition hover:border-amber-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-xl overflow-hidden shrink-0">
+                        {meal.photoUrl ? (
+                          <img src={meal.photoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          meal.emoji || '🍱'
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-stone-800 line-clamp-1">{meal.meal_name}</h4>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-stone-500 font-medium">
+                          <span>🍞 {meal.macros?.carbs ?? 0}g</span>
+                          <span>🥩 {meal.macros?.protein ?? 0}g</span>
+                          <span>🥑 {meal.macros?.fat ?? 0}g</span>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="text-right shrink-0">
-                <span className="text-xs font-black text-amber-600 block">{meal.total_calories} kcal</span>
-                <span className="text-[9px] text-stone-400">點擊修改 ✎</span>
-              </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-black text-amber-600 block">{meal.total_calories} kcal</span>
+                      <span className="text-[9px] text-stone-400">點擊修改 ✎</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          ))
+          </>
         )}
-      </div>
 
         {/* ===================== 2. 趨勢 ===================== */}
         {activeTab === 'trends' && (
@@ -675,7 +659,7 @@ export default function App() {
       <nav className="fixed bottom-4 inset-x-4 max-w-md mx-auto glass rounded-3xl border border-white/60 shadow-xl p-2 flex items-center justify-around z-40">
         <button
           onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition ${
+          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'home' ? 'font-black scale-105 ' + theme.accent : 'text-stone-400'
           }`}
         >
@@ -685,7 +669,7 @@ export default function App() {
 
         <button
           onClick={() => setActiveTab('trends')}
-          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition ${
+          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'trends' ? 'font-black scale-105 ' + theme.accent : 'text-stone-400'
           }`}
         >
@@ -695,14 +679,14 @@ export default function App() {
 
         <button
           onClick={() => setActiveTab('add')}
-          className={`w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition ${theme.primary}`}
+          className={`w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition cursor-pointer ${theme.primary}`}
         >
           <span className="text-xl">{theme.navIcons.add}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('coach')}
-          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition ${
+          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'coach' ? 'font-black scale-105 ' + theme.accent : 'text-stone-400'
           }`}
         >
@@ -712,7 +696,7 @@ export default function App() {
 
         <button
           onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition ${
+          className={`flex flex-col items-center gap-0.5 p-2 rounded-2xl transition cursor-pointer ${
             activeTab === 'settings' ? 'font-black scale-105 ' + theme.accent : 'text-stone-400'
           }`}
         >
@@ -732,7 +716,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setShowThemeModal(false)}
-                className="w-8 h-8 rounded-full bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-full bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -773,149 +757,25 @@ export default function App() {
         </div>
       )}
 
+      {/* 查看、修改、刪除餐點彈窗 */}
       <MealDetailModal
-       meal={selectedMealDetail}
-       onClose={() => setSelectedMealDetail(null)}
-       onDelete={(targetMeal) => {
-         setMeals((prev) => prev.filter((m) => m !== targetMeal && m.id !== targetMeal.id));
-       }}
-       onUpdate={(updatedMeal) => {
-         setMeals((prev) =>
-           prev.map((m) => (m === selectedMealDetail || (m.id && m.id === selectedMealDetail.id) ? updatedMeal : m))
+        meal={selectedMealDetail}
+        onClose={() => setSelectedMealDetail(null)}
+        onDelete={(targetMeal) => {
+          setMeals((prev) => prev.filter((m) => m !== targetMeal && m.id !== targetMeal.id));
+        }}
+        onUpdate={(updatedMeal) => {
+          setMeals((prev) =>
+            prev.map((m) => (m === selectedMealDetail || (m.id && m.id === selectedMealDetail.id) ? updatedMeal : m))
           );
         }}
       />
-      {/* 編輯 / 刪除餐點彈窗 */}
-      {editingMeal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl border border-stone-100 flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-stone-100 pb-3">
-              <h3 className="text-sm font-black text-stone-800 flex items-center gap-1.5">
-                <span>✏️</span> 修改餐點紀錄
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEditingMeal(null)}
-                className="w-7 h-7 rounded-full bg-stone-100 text-stone-400 font-bold flex items-center justify-center text-xs hover:bg-stone-200"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-stone-500 block mb-1">餐點名稱</label>
-                <input
-                  type="text"
-                  value={editingMeal.data.meal_name}
-                  onChange={(e) =>
-                    setEditingMeal({
-                      ...editingMeal,
-                      data: { ...editingMeal.data, meal_name: e.target.value },
-                    })
-                  }
-                  className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-stone-500 block mb-1">總熱量 (kcal)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={editingMeal.data.total_calories}
-                    onChange={(e) =>
-                      setEditingMeal({
-                        ...editingMeal,
-                        data: { ...editingMeal.data, total_calories: parseFloat(e.target.value) || 0 },
-                      })
-                    }
-                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-stone-500 block mb-1">碳水化合物 (g)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={editingMeal.data.macros?.carbs ?? 0}
-                    onChange={(e) =>
-                      setEditingMeal({
-                        ...editingMeal,
-                        data: {
-                          ...editingMeal.data,
-                          macros: { ...editingMeal.data.macros, carbs: parseFloat(e.target.value) || 0 },
-                        },
-                      })
-                    }
-                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-stone-500 block mb-1">蛋白質 (g)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={editingMeal.data.macros?.protein ?? 0}
-                    onChange={(e) =>
-                      setEditingMeal({
-                        ...editingMeal,
-                        data: {
-                          ...editingMeal.data,
-                          macros: { ...editingMeal.data.macros, protein: parseFloat(e.target.value) || 0 },
-                        },
-                      })
-                    }
-                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-stone-500 block mb-1">油脂 (g)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={editingMeal.data.macros?.fat ?? 0}
-                    onChange={(e) =>
-                      setEditingMeal({
-                        ...editingMeal,
-                        data: {
-                          ...editingMeal.data,
-                          macros: { ...editingMeal.data.macros, fat: parseFloat(e.target.value) || 0 },
-                        },
-                      })
-                    }
-                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => handleDeleteMeal(editingMeal.index)}
-                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl text-xs font-bold transition active:scale-95 border border-red-100"
-              >
-                🗑️ 刪除紀錄
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveMeal(editingMeal.index, editingMeal.data)}
-                className="flex-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition active:scale-95 shadow-sm"
-              >
-                儲存修改
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 /* =========================================================================
-   新增餐點視圖
+   新增餐點視圖（含照片壓縮、503重試防護與總碳水精算）
    ========================================================================= */
 function AddMealView({ theme, onMealLogged }) {
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -926,6 +786,7 @@ function AddMealView({ theme, onMealLogged }) {
   const [manual, setManual] = useState({ calories: '', carbs: '', protein: '', fat: '' });
   const [loading, setLoading] = useState(false);
 
+  // 前端 Canvas 自動壓縮照片至 400px，體積 < 50KB 防止 localStorage 塞爆白屏
   const handleCapture = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -936,17 +797,29 @@ function AddMealView({ theme, onMealLogged }) {
       const img = new Image();
       img.src = event.target.result;
       img.onload = () => {
-        const size = Math.min(img.width, img.height);
-        const startX = (img.width - size) / 2;
-        const startY = (img.height - size) / 2;
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
 
         const canvas = document.createElement('canvas');
-        canvas.width = 600;
-        canvas.height = 600;
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, startX, startY, size, size, 0, 0, 600, 600);
+        ctx.drawImage(img, 0, 0, width, height);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         setPhotoPreview(dataUrl);
         setPhotoBase64(dataUrl.split(',')[1]);
       };
@@ -974,10 +847,18 @@ function AddMealView({ theme, onMealLogged }) {
       } else {
         if (!genAI) throw new Error('未偵測到 Gemini API Key，請先在設定中填入金鑰！');
 
-        const prompt =
-          activeMode === 'recipe'
-            ? `使用者自己煮了這道菜：${mealName || '自製料理'}。詳細食材與重量：\n${recipeText}\n請精算總熱量、碳水、蛋白質、油脂(g)。`
-            : `請辨識這張食物照片（備註：${mealName || '外食餐點'}），推估熱量、碳水、蛋白質、油脂(g)。`;
+        let prompt = `你是一位專業且嚴謹的運動營養師與減重教練。請根據以下食材資訊進行精確的營養成分計算。
+
+【嚴格計算準則】：
+1. 碳水化合物必須計算「總碳水（Total Carbohydrates）」，包含所有蔬菜、菇類、洋蔥與調味料的微量碳水與膳食纖維，嚴禁只算主食澱粉，亦不可只給淨碳水。
+2. 若標註「帶皮生重」或生重，請以標準可食用部位全量估算，勿過度扣除廢棄率。
+3. 蛋白質與脂肪需依實際肉類部位（如去皮/帶皮、脂肪比例）嚴格累加。
+4. 總熱量 (total_calories) 請以三大營養素精確換算（碳水×4 + 蛋白質×4 + 脂肪×9），並四捨五入至整數。
+`;
+
+        if (mealName.trim()) prompt += `\n餐點名稱：${mealName.trim()}`;
+        if (activeMode === 'recipe' && recipeText.trim()) prompt += `\n食材清單與克數：\n${recipeText.trim()}`;
+        if (photoBase64) prompt += `\n請同時結合照片中的食材份量、烹調油光與外觀輔助校正。`;
 
         const parts = [prompt];
         if (photoBase64) {
@@ -1021,9 +902,7 @@ function AddMealView({ theme, onMealLogged }) {
           } catch (err) {
             console.warn(`模型 ${modelName} 呼叫失敗，嘗試備用模型...`, err);
             lastError = err;
-            if (err.message?.includes('429')) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
+            await new Promise((resolve) => setTimeout(resolve, 600));
           }
         }
 
@@ -1031,10 +910,25 @@ function AddMealView({ theme, onMealLogged }) {
           throw lastError || new Error('AI 分析失敗，請稍候重試！');
         }
       }
-      if (result) onMealLogged(result);
+
+      if (result) {
+        const safeMeal = {
+          meal_name: result.meal_name || mealName || '自製料理',
+          total_calories: Math.round(Number(result.total_calories) || 0),
+          macros: {
+            carbs: Number(Number(result.macros?.carbs || 0).toFixed(1)),
+            protein: Number(Number(result.macros?.protein || 0).toFixed(1)),
+            fat: Number(Number(result.macros?.fat || 0).toFixed(1)),
+          },
+          photoUrl: photoPreview || null,
+          advice: result.advice || '健康美味的一餐！',
+          items: result.items || [],
+        };
+        onMealLogged(safeMeal);
+      }
     } catch (err) {
       console.error(err);
-      alert('計算失敗：' + (err.message || '請確認 API Key！'));
+      alert('計算失敗：' + (err.message || '請確認網路或 API Key！'));
     } finally {
       setLoading(false);
     }
@@ -1051,7 +945,7 @@ function AddMealView({ theme, onMealLogged }) {
             <div className="absolute bottom-2 right-2 flex gap-1">
               <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
                 📷 重拍
-                <input type="file" accept="image/*" className="hidden" onChange={handleCapture} />
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
               </label>
               <label className="bg-black/60 hover:bg-black/80 text-white px-2 py-1 rounded-full cursor-pointer text-[10px] font-bold">
                 🖼️ 重選
@@ -1061,7 +955,6 @@ function AddMealView({ theme, onMealLogged }) {
           </div>
         ) : (
           <div className="w-full flex gap-3">
-            {/* 按鈕 1：強制啟動相機拍照 */}
             <label className="flex-1 py-7 border-2 border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-50 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
               <span className="text-3xl">📷</span>
               <span className="text-xs font-bold text-amber-800">直接拍照</span>
@@ -1074,7 +967,6 @@ function AddMealView({ theme, onMealLogged }) {
               />
             </label>
 
-            {/* 按鈕 2：直接挑選相簿 */}
             <label className="flex-1 py-7 border-2 border-dashed border-stone-300 bg-stone-50/50 hover:bg-stone-100 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer transition active:scale-95">
               <span className="text-3xl">🖼️</span>
               <span className="text-xs font-bold text-stone-700">從相簿挑選</span>
@@ -1094,28 +986,28 @@ function AddMealView({ theme, onMealLogged }) {
         placeholder="餐點名稱（例如：香煎鱸魚配十穀飯 / 超商烤雞沙拉）"
         value={mealName}
         onChange={(e) => setMealName(e.target.value)}
-        className="bg-white p-3.5 rounded-2xl border border-stone-200/80 text-sm outline-none shadow-sm"
+        className="bg-white p-3.5 rounded-2xl border border-stone-200/80 text-sm outline-none shadow-sm font-bold text-stone-800"
       />
 
       <div className="grid grid-cols-3 gap-1 bg-stone-200/60 p-1 rounded-2xl text-xs font-bold">
         <button
           type="button"
           onClick={() => setActiveMode('recipe')}
-          className={`py-2 rounded-xl transition ${activeMode === 'recipe' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
+          className={`py-2 rounded-xl transition cursor-pointer ${activeMode === 'recipe' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
         >
           1. 寫食材 AI 算
         </button>
         <button
           type="button"
           onClick={() => setActiveMode('manual')}
-          className={`py-2 rounded-xl transition ${activeMode === 'manual' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
+          className={`py-2 rounded-xl transition cursor-pointer ${activeMode === 'manual' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
         >
           2. 手動填克數
         </button>
         <button
           type="button"
           onClick={() => setActiveMode('ai_photo')}
-          className={`py-2 rounded-xl transition ${activeMode === 'ai_photo' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
+          className={`py-2 rounded-xl transition cursor-pointer ${activeMode === 'ai_photo' ? 'bg-white shadow-sm text-stone-800' : 'text-stone-500'}`}
         >
           3. 純照片 AI 算
         </button>
@@ -1188,7 +1080,7 @@ function AddMealView({ theme, onMealLogged }) {
       <button
         onClick={handleCalculate}
         disabled={loading || (activeMode === 'recipe' && !recipeText.trim())}
-        className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition disabled:opacity-40 ${theme.primary}`}
+        className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition cursor-pointer disabled:opacity-40 ${theme.primary}`}
       >
         {loading ? 'AI 正精算營養成分中...' : '確認並丟入沙盒 🚀'}
       </button>
@@ -1259,9 +1151,7 @@ function AICoachView({ theme, statusContext }) {
         } catch (err) {
           console.warn(`貓貓教練呼叫 ${modelName} 失敗，嘗試備用模型...`, err);
           lastError = err;
-          if (err.message?.includes('429')) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
+          await new Promise((resolve) => setTimeout(resolve, 600));
         }
       }
 
@@ -1344,7 +1234,7 @@ function AICoachView({ theme, statusContext }) {
           <button
             key={idx}
             onClick={() => sendMessage(q)}
-            className="text-[11px] whitespace-nowrap bg-amber-50/70 hover:bg-amber-100 text-amber-800 border border-amber-200/50 px-3 py-1.5 rounded-full font-bold active:scale-95 transition"
+            className="text-[11px] whitespace-nowrap bg-amber-50/70 hover:bg-amber-100 text-amber-800 border border-amber-200/50 px-3 py-1.5 rounded-full font-bold active:scale-95 transition cursor-pointer"
           >
             {q}
           </button>
@@ -1363,7 +1253,7 @@ function AICoachView({ theme, statusContext }) {
         <button
           onClick={() => sendMessage()}
           disabled={loading}
-          className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm active:scale-90 transition disabled:opacity-40 ${theme.primary}`}
+          className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm shadow-sm active:scale-90 transition disabled:opacity-40 cursor-pointer ${theme.primary}`}
         >
           🐾
         </button>
@@ -1745,7 +1635,7 @@ function TrendsView({ userProfile = {}, setUserProfile, weightHistory = {}, onUp
 }
 
 /* =========================================================================
-   設定視圖 (含個人身體數據與重設功能)
+   設定視圖
    ========================================================================= */
 function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, selectedDate }) {
   const [profile, setProfile] = useState(userProfile);
@@ -1828,7 +1718,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
 
             <button
               onClick={() => setShowPwaModal(false)}
-              className={`w-full py-2.5 text-xs font-bold rounded-xl ${theme.primary}`}
+              className={`w-full py-2.5 text-xs font-bold rounded-xl cursor-pointer ${theme.primary}`}
             >
               我知道了
             </button>
@@ -1857,7 +1747,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
         <span className="text-sm font-bold text-stone-300">❯</span>
       </div>
 
-      {/* 👤 個人基本身體數據 */}
+      {/* 個人基本身體數據 */}
       <div className="bg-white p-4 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col gap-3">
         <span className="text-xs font-bold text-stone-700">👤 個人身體數據 (計算 BMI 與每日基準)</span>
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -2018,7 +1908,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
         </div>
       </div>
 
-      {/* 🗑️ 重設當天紀錄按鈕 */}
+      {/* 重設當天紀錄按鈕 */}
       <button
         type="button"
         onClick={handleResetCurrentDay}
@@ -2029,7 +1919,7 @@ function SettingsView({ theme, onOpenThemeModal, userProfile, setUserProfile, se
 
       <button
         onClick={handleSave}
-        className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition ${theme.primary}`}
+        className={`w-full py-4 rounded-2xl font-black text-sm shadow-md active:scale-95 transition cursor-pointer ${theme.primary}`}
       >
         {savedSuccess ? '儲存成功！已同步至首頁 ✓' : '儲存所有設定'}
       </button>
