@@ -212,6 +212,35 @@ export default function App() {
   const [exerciseMinutes, setExerciseMinutes] = useState(initialTodayData.minutes);
   const [selectedMealDetail, setSelectedMealDetail] = useState(null);
 
+  // 記錄目前正在編輯哪一筆餐點（儲存 index 與完整餐點物件）
+  const [editingMeal, setEditingMeal] = useState(null);
+
+  // 刪除餐點處理函式
+  const handleDeleteMeal = (index) => {
+    if (window.confirm('確定要刪除這筆餐點紀錄嗎？沙盒裡的這道菜也會一起移除喔！')) {
+      const updated = meals.filter((_, i) => i !== index);
+      setMeals(updated);
+      setEditingMeal(null);
+    }
+  };
+
+  // 儲存修改後的餐點處理函式
+  const handleSaveMeal = (index, updatedItem) => {
+    const updated = [...meals];
+    // 確保數值轉換為乾淨純數字，避免格式化報錯
+    updated[index] = {
+      ...updatedItem,
+      total_calories: Math.round(Number(updatedItem.total_calories) || 0),
+      macros: {
+        carbs: Number(Number(updatedItem.macros?.carbs || 0).toFixed(1)),
+        protein: Number(Number(updatedItem.macros?.protein || 0).toFixed(1)),
+        fat: Number(Number(updatedItem.macros?.fat || 0).toFixed(1)),
+      },
+    };
+    setMeals(updated);
+    setEditingMeal(null);
+  };
+
   // 切換日期的處理函式
   const handleDateChange = (newDate) => {
     localStorage.setItem(`meals_${selectedDate}`, JSON.stringify(meals));
@@ -543,47 +572,47 @@ export default function App() {
 
             {/* 餐點清單 */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-stone-500">今日餐點總覽</span>
+              <div className="flex justify-between items-center px-1">
+              <h3 className="text-xs font-black text-stone-500 tracking-wider">今日餐點總覽</h3>
+              <span className="text-[10px] text-stone-400">點擊卡片可修改或刪除</span>
+            </div>
               {meals.length === 0 ? (
                 <div className="text-center py-6 bg-white/60 rounded-3xl border border-dashed border-stone-200 text-stone-400 text-xs">
                   今天還沒記錄餐點，按下方中間按鈕新增拍照吧！
                 </div>
               ) : (
-                meals.map((meal) => (
-                  <div
-                    key={meal.id}
-                    onClick={() => setSelectedMealDetail(meal)}
-                    className="bg-white p-3 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.99] transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      {meal.photoUrl ? (
-                        <img src={meal.photoUrl} alt="餐點" className="w-12 h-12 rounded-xl object-cover border border-stone-100 shadow-xs" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-stone-100 flex items-center justify-center text-2xl">
-                          🍱
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-sm font-bold text-stone-800">{meal.meal_name}</div>
-                        <div className="text-[11px] text-stone-400 flex items-center gap-1 mt-0.5">
-                          <span>🍞 {meal.macros?.carbs || 0}g</span>
-                          <span>•</span>
-                          <span>🥩 {meal.macros?.protein || 0}g</span>
-                          <span>•</span>
-                          <span>🥑 {meal.macros?.fat || 0}g</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-black text-amber-600">{meal.total_calories} kcal</div>
-                      <div className="text-[10px] text-stone-400">{meal.time}</div>
-                    </div>
+                meals.map((meal, idx) => (
+            <div
+              key={idx}
+              onClick={() => setEditingMeal({ index: idx, data: { ...meal } })}
+              className="bg-white p-3.5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between cursor-pointer active:scale-[0.98] transition hover:border-amber-300"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-xl overflow-hidden shrink-0">
+                  {meal.photoUrl ? (
+                    <img src={meal.photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    '🍱'
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-stone-800 line-clamp-1">{meal.meal_name}</h4>
+                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-stone-500 font-medium">
+                    <span>🍞 {meal.macros?.carbs ?? 0}g</span>
+                    <span>🥩 {meal.macros?.protein ?? 0}g</span>
+                    <span>🥑 {meal.macros?.fat ?? 0}g</span>
                   </div>
-                ))
-              )}
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <span className="text-xs font-black text-amber-600 block">{meal.total_calories} kcal</span>
+                <span className="text-[9px] text-stone-400">點擊修改 ✎</span>
+              </div>
             </div>
-          </>
+          ))
         )}
+      </div>
 
         {/* ===================== 2. 趨勢 ===================== */}
         {activeTab === 'trends' && (
@@ -745,6 +774,131 @@ export default function App() {
       )}
 
       <MealDetailModal meal={selectedMealDetail} onClose={() => setSelectedMealDetail(null)} />
+      {/* 編輯 / 刪除餐點彈窗 */}
+      {editingMeal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl border border-stone-100 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+              <h3 className="text-sm font-black text-stone-800 flex items-center gap-1.5">
+                <span>✏️</span> 修改餐點紀錄
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingMeal(null)}
+                className="w-7 h-7 rounded-full bg-stone-100 text-stone-400 font-bold flex items-center justify-center text-xs hover:bg-stone-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-stone-500 block mb-1">餐點名稱</label>
+                <input
+                  type="text"
+                  value={editingMeal.data.meal_name}
+                  onChange={(e) =>
+                    setEditingMeal({
+                      ...editingMeal,
+                      data: { ...editingMeal.data, meal_name: e.target.value },
+                    })
+                  }
+                  className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-stone-500 block mb-1">總熱量 (kcal)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingMeal.data.total_calories}
+                    onChange={(e) =>
+                      setEditingMeal({
+                        ...editingMeal,
+                        data: { ...editingMeal.data, total_calories: parseFloat(e.target.value) || 0 },
+                      })
+                    }
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-stone-500 block mb-1">碳水化合物 (g)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingMeal.data.macros?.carbs ?? 0}
+                    onChange={(e) =>
+                      setEditingMeal({
+                        ...editingMeal,
+                        data: {
+                          ...editingMeal.data,
+                          macros: { ...editingMeal.data.macros, carbs: parseFloat(e.target.value) || 0 },
+                        },
+                      })
+                    }
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-stone-500 block mb-1">蛋白質 (g)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingMeal.data.macros?.protein ?? 0}
+                    onChange={(e) =>
+                      setEditingMeal({
+                        ...editingMeal,
+                        data: {
+                          ...editingMeal.data,
+                          macros: { ...editingMeal.data.macros, protein: parseFloat(e.target.value) || 0 },
+                        },
+                      })
+                    }
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-stone-500 block mb-1">油脂 (g)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={editingMeal.data.macros?.fat ?? 0}
+                    onChange={(e) =>
+                      setEditingMeal({
+                        ...editingMeal,
+                        data: {
+                          ...editingMeal.data,
+                          macros: { ...editingMeal.data.macros, fat: parseFloat(e.target.value) || 0 },
+                        },
+                      })
+                    }
+                    className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleDeleteMeal(editingMeal.index)}
+                className="flex-1 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl text-xs font-bold transition active:scale-95 border border-red-100"
+              >
+                🗑️ 刪除紀錄
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveMeal(editingMeal.index, editingMeal.data)}
+                className="flex-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition active:scale-95 shadow-sm"
+              >
+                儲存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1072,7 +1226,7 @@ function AICoachView({ theme, statusContext }) {
 使用者今日即時狀態：
 - 今日型態：${statusContext.dayType === 'workout' ? '⚡ 運動日（可以吃多一點點碳水喵！）' : '☕ 休息日（清淡舒服為主喵～）'}
 - 剩餘熱量額度：${Number(statusContext.remainCalories.toFixed(1))} kcal
-- 剩餘碳水：${Number(statusContext.remainCarbs.toFixed(1)) g
+- 剩餘碳水：${Number(statusContext.remainCarbs.toFixed(1))} g
 - 剩餘蛋白質：${Number(statusContext.remainProtein.toFixed(1))} g
 - 剩餘油脂：${Number(statusContext.remainFat.toFixed(1))} g
 - 今日運動消耗：${statusContext.totalBurn} kcal
